@@ -51,7 +51,7 @@ agentic-saga = "agentic_saga.cli.main:entrypoint"
 dev = [
   "pydantic-ai-slim[openrouter]==2.45.0",
   "openrouter==1.2.1",
-  "hatchling==1.27.0",
+  "hatchling==1.32.4",
   "hypothesis>=6.130,<7",
   "mutmut>=3.6,<4",
   "mypy>=1.17,<2",
