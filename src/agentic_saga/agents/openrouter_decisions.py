@@ -13,7 +13,8 @@ from typing import Literal, Protocol, cast
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 from agentic_saga.agents.choice import CandidateFactory, ChoiceAgentDriver, DecisionSelection
-from agentic_saga.agents.pydanticai import AgentFailureCategory, AgentPlanningError
+from agentic_saga.agents.failures import AgentFailureCategory, classify_http_status
+from agentic_saga.agents.pydanticai import AgentPlanningError
 from agentic_saga.manifest import SagaContext
 
 _PINNED_MODEL: Literal["typesafe/jev-1.13"] = "typesafe/jev-1.13"
@@ -24,10 +25,8 @@ _INSTRUCTIONS = (
     "Select the safest eligible next Saga proposal from current public evidence. "
     "Do not invent actions or arguments."
 )
-_TOO_MANY_REQUESTS = 429
+# The SDK raises on a 2xx/3xx only when it could not parse the response body.
 _INVALID_RESPONSE_RANGE = range(200, 400)
-_CLIENT_ERROR_RANGE = range(400, 500)
-_SERVER_ERROR_RANGE = range(500, 600)
 
 
 class _Decisions(Protocol):
@@ -291,7 +290,7 @@ def _dependencies_from_modules(sdk: ModuleType, httpx: ModuleType) -> _OpenRoute
 def _failure_category(
     error: Exception, transport_errors: tuple[type[BaseException], ...]
 ) -> AgentFailureCategory:
-    http = _http_failure_category(_status_code(error))
+    http = classify_http_status(_status_code(error), invalid_response=_INVALID_RESPONSE_RANGE)
     if http is not None:
         return http
     if isinstance(error, transport_errors):
@@ -299,18 +298,6 @@ def _failure_category(
     if isinstance(error, ValueError):
         return AgentFailureCategory.INVALID_RESPONSE
     return AgentFailureCategory.INTERNAL
-
-
-def _http_failure_category(status: int | None) -> AgentFailureCategory | None:
-    if status in _INVALID_RESPONSE_RANGE:
-        return AgentFailureCategory.INVALID_RESPONSE
-    if status == _TOO_MANY_REQUESTS:
-        return AgentFailureCategory.RATE_LIMIT_EXHAUSTED
-    if status in _CLIENT_ERROR_RANGE:
-        return AgentFailureCategory.REQUEST_REJECTED
-    if status in _SERVER_ERROR_RANGE:
-        return AgentFailureCategory.SERVER_ERROR_EXHAUSTED
-    return None
 
 
 def _status_code(error: Exception) -> int | None:

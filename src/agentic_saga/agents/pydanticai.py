@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from importlib import import_module
 from types import MappingProxyType, ModuleType
 from typing import Annotated, Literal, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError
 
+from agentic_saga.agents.failures import AgentFailureCategory, classify_http_status
 from agentic_saga.contracts.actions import (
     AgentProposal,
     Finish,
@@ -30,9 +30,6 @@ type _BoundedName = Annotated[str, StringConstraints(min_length=1, max_length=20
 type _Rationale = Annotated[str, StringConstraints(min_length=1, max_length=500)]
 type _TerminalStatus = Literal["succeeded_verified"]
 
-_TOO_MANY_REQUESTS = 429
-_CLIENT_ERROR_RANGE = range(400, 500)
-_SERVER_ERROR_RANGE = range(500, 600)
 _PROPOSAL_ID_DOMAIN = "agentic-saga:native-tool-proposal:v1"
 _TOOLSET_ID = "agentic-saga-eligible-proposals"
 _FINISH_TOOL = "finish_saga"
@@ -99,17 +96,6 @@ _AGENT_OPTIONS: Mapping[str, object] = MappingProxyType(
         "retries": _MODEL_RESULT_RETRIES,
     }
 )
-
-
-class AgentFailureCategory(StrEnum):
-    """Closed, secret-free reason for an adapter planning failure."""
-
-    RATE_LIMIT_EXHAUSTED = "rate_limit_exhausted"
-    REQUEST_REJECTED = "request_rejected"
-    SERVER_ERROR_EXHAUSTED = "server_error_exhausted"
-    TRANSPORT_EXHAUSTED = "transport_exhausted"
-    INVALID_RESPONSE = "invalid_response"
-    INTERNAL = "internal"
 
 
 class AgentPlanningError(RuntimeError):
@@ -550,7 +536,7 @@ def _required_tool_capability() -> object:
 
 
 def _failure_category(error: Exception) -> AgentFailureCategory:
-    http_category = _http_failure_category(_status_code(error))
+    http_category = classify_http_status(_status_code(error))
     if http_category is not None:
         return http_category
     if isinstance(error, (ConnectionError, OSError, TimeoutError)):
@@ -567,16 +553,6 @@ def _is_invalid_model_response(error: Exception) -> bool:
         return False
     error_type = getattr(exceptions, "UnexpectedModelBehavior", None)
     return isinstance(error_type, type) and isinstance(error, error_type)
-
-
-def _http_failure_category(status: int | None) -> AgentFailureCategory | None:
-    if status == _TOO_MANY_REQUESTS:
-        return AgentFailureCategory.RATE_LIMIT_EXHAUSTED
-    if status in _CLIENT_ERROR_RANGE:
-        return AgentFailureCategory.REQUEST_REJECTED
-    if status in _SERVER_ERROR_RANGE:
-        return AgentFailureCategory.SERVER_ERROR_EXHAUSTED
-    return None
 
 
 def _status_code(error: Exception) -> int | None:
@@ -698,4 +674,5 @@ def _same_tool_contract(expected: ToolDescriptor, current: ToolDescriptor) -> bo
     )
 
 
-__all__ = ["PydanticAIDriver", "native_proposal_tool_names"]
+# AgentFailureCategory is re-exported so existing imports from this module keep working.
+__all__ = ["AgentFailureCategory", "PydanticAIDriver", "native_proposal_tool_names"]

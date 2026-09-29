@@ -103,10 +103,30 @@ the result. If a reply is lost, it asks the provider what happened before doing 
 job only counts as done after a fresh check proves it; otherwise every finished step is undone in
 reverse order, and a person is asked only when the undo itself cannot be proven.
 
-The agent can be the scripted driver used above, a model reached through
-[Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or Jev (a decision engine that ranks a
-fixed list of choices your app builds). See the
-[agent adapter guide](docs/agent-adapter.md).
+### Who decides the next step
+
+The default decision engine is Jev, reached through OpenRouter. Here is where it sits. The saga is
+the job: steps that each have an undo (reserve stock, charge the card, create the order; undone by
+cancel, refund, release). Temporal is the record keeper that runs the job as a durable state
+machine. Jev only picks the next step: your app lists the complete steps allowed right now, and Jev
+chooses one and says how sure it is. It never writes arguments and never decides how to undo; the
+workflow does that. Jev runs inside the `agentic_saga.decide` Temporal Activity, so its answer is
+recorded in history and a replay reads the recorded answer instead of asking again.
+
+It needs one key, `OPENROUTER_API_KEY`, the same one the Pydantic AI planner uses:
+
+```python
+from agentic_saga.agents import OpenRouterDecisionsSettings, build_openrouter_decisions_driver
+
+# context: your SagaContext; candidates: async function returning the allowed ProposalCandidates
+driver = build_openrouter_decisions_driver(
+    context, candidates, OpenRouterDecisionsSettings.from_environment()
+)
+```
+
+The [agent adapter guide](docs/agent-adapter.md) has the full runnable example. The alternatives
+are Jev called directly from TypeSafe (`build_jev_driver` with `TYPESAFE_API_KEY`), a model reached
+through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or the scripted driver used above.
 
 ## What it does not do
 
@@ -143,8 +163,8 @@ git clone https://github.com/hseshadr/agentic-saga.git
 cd agentic-saga
 uv sync --group dev                         # library, tests, and the example
 uv sync --extra agent --group dev           # + Pydantic AI through OpenRouter
-uv sync --extra jev --group dev             # + Jev (TypeSafe API)
-uv sync --extra jev-openrouter --group dev  # + Jev through OpenRouter Decisions
+uv sync --extra jev-openrouter --group dev  # + Jev through OpenRouter (default decision engine)
+uv sync --extra jev --group dev             # + Jev direct from TypeSafe (alternative)
 ```
 
 For the optional AI agent, `cp .env.example .env` and add your `OPENROUTER_API_KEY`. The library
@@ -175,7 +195,8 @@ The browser replay app in `web/flight-recorder/` has its own check. Start with
 - [Temporal safety contract](docs/temporal-safety-contract.md): the exact rules the Workflow
   enforces.
 - [Operations](docs/operations.md): running Workers, retries, human pauses, and known limits.
-- [Agent adapters](docs/agent-adapter.md): the scripted driver, Pydantic AI, and Jev.
+- [Agent adapters](docs/agent-adapter.md): Jev through OpenRouter (the default), Jev direct,
+  Pydantic AI, and the scripted driver.
 - [Context manifest](docs/context-manifest.md): describing a job to the agent in `saga.yaml`.
 - [Flight Recorder](docs/flight-recorder.md): the browser replay of recorded runs.
 - [ADR 0001](docs/adr/0001-temporal-runtime.md): why Temporal is the only durability engine.

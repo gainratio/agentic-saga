@@ -25,7 +25,8 @@ from agentic_saga.agents.choice import (
     ChoiceAgentDriver,
     DecisionSelection,
 )
-from agentic_saga.agents.pydanticai import AgentFailureCategory, AgentPlanningError
+from agentic_saga.agents.failures import AgentFailureCategory, classify_http_status
+from agentic_saga.agents.pydanticai import AgentPlanningError
 from agentic_saga.manifest import SagaContext
 
 type _ModelId = Annotated[
@@ -41,10 +42,8 @@ _INSTRUCTIONS = (
     "Do not invent actions or arguments."
 )
 _MILLISECONDS_PER_SECOND = 1_000
-_TOO_MANY_REQUESTS = 429
+# The SDK raises on a 2xx only when it could not validate the response body.
 _SUCCESS_RANGE = range(200, 300)
-_CLIENT_ERROR_RANGE = range(400, 500)
-_SERVER_ERROR_RANGE = range(500, 600)
 
 
 class _ChoiceFactory(Protocol):
@@ -229,7 +228,7 @@ def _dependencies_from_module(sdk: ModuleType) -> _JevDependencies:
 
 
 def _failure_category(error: Exception) -> AgentFailureCategory:
-    http = _http_failure_category(_status(error))
+    http = classify_http_status(_status(error), invalid_response=_SUCCESS_RANGE)
     if http is not None:
         return http
     if isinstance(error, (ConnectionError, OSError, TimeoutError)):
@@ -237,18 +236,6 @@ def _failure_category(error: Exception) -> AgentFailureCategory:
     if isinstance(error, ValueError):
         return AgentFailureCategory.INVALID_RESPONSE
     return AgentFailureCategory.INTERNAL
-
-
-def _http_failure_category(status: int | None) -> AgentFailureCategory | None:
-    if status in _SUCCESS_RANGE:
-        return AgentFailureCategory.INVALID_RESPONSE
-    if status == _TOO_MANY_REQUESTS:
-        return AgentFailureCategory.RATE_LIMIT_EXHAUSTED
-    if status in _CLIENT_ERROR_RANGE:
-        return AgentFailureCategory.REQUEST_REJECTED
-    if status in _SERVER_ERROR_RANGE:
-        return AgentFailureCategory.SERVER_ERROR_EXHAUSTED
-    return None
 
 
 def _status(error: Exception) -> int | None:
