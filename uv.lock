@@ -51,9 +51,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openrouter", marker = "extra == 'jev-openrouter'", specifier = "==1.2.1" },
+    { name = "openrouter", marker = "extra == 'jev-openrouter'", specifier = "==1.2.10" },
     { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pydantic-ai-slim", extras = ["openrouter"], marker = "extra == 'agent'", specifier = "==2.45.0" },
+    { name = "pydantic-ai-slim", extras = ["openrouter"], marker = "extra == 'agent'", specifier = "==2.46.0" },
     { name = "python-dotenv", marker = "extra == 'agent'", specifier = ">=1.1,<2" },
     { name = "ruamel-yaml", specifier = ">=0.19,<0.20" },
     { name = "temporalio", specifier = ">=1.20,<2" },
@@ -63,14 +63,14 @@ provides-extras = ["agent", "jev", "jev-openrouter"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "hatchling", specifier = "==1.27.0" },
+    { name = "hatchling", specifier = "==1.32.4" },
     { name = "hypothesis", specifier = ">=6.130,<7" },
     { name = "mutmut", specifier = ">=3.6,<4" },
     { name = "mypy", specifier = ">=1.17,<2" },
-    { name = "openrouter", specifier = "==1.2.1" },
+    { name = "openrouter", specifier = "==1.2.10" },
     { name = "pip", specifier = ">=25,<27" },
     { name = "poethepoet", specifier = ">=0.37,<1" },
-    { name = "pydantic-ai-slim", extras = ["openrouter"], specifier = "==2.45.0" },
+    { name = "pydantic-ai-slim", extras = ["openrouter"], specifier = "==2.46.0" },
     { name = "pytest", specifier = ">=9,<10" },
     { name = "pytest-asyncio", specifier = ">=1.2,<2" },
     { name = "pytest-bdd", specifier = ">=8.1,<9" },
@@ -284,17 +284,18 @@ wheels = [
 
 [[package]]
 name = "hatchling"
-version = "1.27.0"
+version = "1.32.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
     { name = "pathspec" },
     { name = "pluggy" },
+    { name = "tomlkit" },
     { name = "trove-classifiers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8f/8a/cc1debe3514da292094f1c3a700e4ca25442489731ef7c0814358816bb03/hatchling-1.27.0.tar.gz", hash = "sha256:971c296d9819abb3811112fc52c7a9751c8d381898f36533bb16f9791e941fd6", size = 54983, upload-time = "2024-12-15T17:08:11.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/97/b5312f01a8c6daf729a9d272dd442e0c546dbcc630495788786c4b567ed0/hatchling-1.32.4.tar.gz", hash = "sha256:c4468f73144c054d2aab4ef0f0378c43b9878bf07f8ffd6b79690e970d375f07", size = 58065, upload-time = "2026-09-20T22:48:45.398Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/e7/ae38d7a6dfba0533684e0b2136817d667588ae3ec984c1a4e5df5eb88482/hatchling-1.27.0-py3-none-any.whl", hash = "sha256:d3a2f3567c4f926ea39849cdf924c7e99e6686c9c8e288ae1037c8fa2a5d937b", size = 75794, upload-time = "2024-12-15T17:08:10.364Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/80/91f51f439c05d4ec4623c22928ce16a938d6d793bf709477830823497859/hatchling-1.32.4-py3-none-any.whl", hash = "sha256:08ecf7548fb48205e7f213d70c71e67b8271b7242093dc3f1da578b42c734a2c", size = 78748, upload-time = "2026-09-20T22:48:44.19Z" },
 ]
 
 [[package]]
@@ -760,7 +761,7 @@ wheels = [
 
 [[package]]
 name = "openrouter"
-version = "1.2.1"
+version = "1.2.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpcore" },
@@ -768,9 +769,9 @@ dependencies = [
     { name = "jsonpath-python" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/c6/ae531aff07c5272301e345a29181144f75a146d2b9a9e3d49fcff4c15377/openrouter-1.2.1.tar.gz", hash = "sha256:5993b561e6a90e016fe1842bd32aec24813f9f9d44d9ff4fbc6f170c213d3528", size = 496223, upload-time = "2026-09-19T02:21:32.514Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/89/ec90b7df3230a4a9bce76d08e0856fadf62149937b5fab66d8a21ba42c7b/openrouter-1.2.10.tar.gz", hash = "sha256:9178a00babdf097cd6c34d06974ef5538277e8ef53dedd6c0bccc25bcc4af634", size = 500010, upload-time = "2026-09-21T03:27:40.31Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/c2/efde0d004db4930dc1ad6f4fbfe6df394a540786c7d331c74bebf6790b69/openrouter-1.2.1-py3-none-any.whl", hash = "sha256:69129f560a4ed763f1db955cbc52f71e81d74c252201b02b0d0431c33cbcd03a", size = 1067497, upload-time = "2026-09-19T02:21:30.864Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/e8/48df1fc9527c24238acaf543a17172e251603181e14b3b935fac3857cb19/openrouter-1.2.10-py3-none-any.whl", hash = "sha256:efd56e86ebab9b10328f3cee6cd6c69216ca3c9ed328c0df5f2f6051ba8b45b9", size = 1075458, upload-time = "2026-09-21T03:27:39.009Z" },
 ]
 
 [[package]]
@@ -906,7 +907,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-ai-slim"
-version = "2.45.0"
+version = "2.46.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -918,9 +919,9 @@ dependencies = [
     { name = "pydantic-graph" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/70/ad/d39e46c192e04df2e620871592054185aed4e212558d90bf89436aa7628d/pydantic_ai_slim-2.45.0.tar.gz", hash = "sha256:34cf5216ebe05cb3d343129bb24a1bd011c66e89dd620f00afa982bd2484e3bf", size = 1562650, upload-time = "2026-09-18T04:50:15.315Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/33/a9bcf6972e772065f15b9b6524a3650976df5c7067d6d534da2eed26ec16/pydantic_ai_slim-2.46.0.tar.gz", hash = "sha256:2eeee7e384385f53ac772fb8927307d9facbf5c22556dca0f0c4416eee57dc05", size = 1587728, upload-time = "2026-09-19T04:06:09.718Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/5b/1397c8c65eaeae781ec489db648ab24125268b749d1f256ba7c13b07891e/pydantic_ai_slim-2.45.0-py3-none-any.whl", hash = "sha256:0914f4e307c64401b676bbba2d613da69f74dbeaab4e2e8516d0d9b53f4ab483", size = 1857668, upload-time = "2026-09-18T04:50:07.395Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/fc/6a28534bc4b27026225fec76b4a2cb97274a0bda601a90890676b09c5132/pydantic_ai_slim-2.46.0-py3-none-any.whl", hash = "sha256:c683dce9e9e05e9fe9302fb43ce95ae8e2456f43ed7ccbfc1ccee102c3a55a53", size = 1883684, upload-time = "2026-09-19T04:06:01.619Z" },
 ]
 
 [package.optional-dependencies]
@@ -973,7 +974,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-graph"
-version = "2.45.0"
+version = "2.46.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -981,9 +982,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/ee/d4f4c73eb91241af7a06e4c36ef58c18d3622dc03d8343825464ec06cb2e/pydantic_graph-2.45.0.tar.gz", hash = "sha256:c07e8cee55f25d79ea2ea55de67fc67d0353ec2807e3a1328f42995edf022c23", size = 45192, upload-time = "2026-09-18T04:50:17.706Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/01/b9589080953ee28d10106457c074fb4918d5cde23f1e66ba5c398f6eab24/pydantic_graph-2.46.0.tar.gz", hash = "sha256:fa45298902c4048b323ad41be8529daa4d727bbb276763bcb4dd153d96908829", size = 45188, upload-time = "2026-09-19T04:06:11.958Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/56/d040149787ae9ade628f05c1e7f30657437731b0e2bb3a2cdb6cb979b7af/pydantic_graph-2.45.0-py3-none-any.whl", hash = "sha256:60fef7eab40a103510f0baf6d17cdd11418672cb64a7524089fbaf845f45aa1a", size = 52701, upload-time = "2026-09-18T04:50:10.72Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/7d/711d5e3a1ca9f560a365080779858be76510ff615a5106121ba0430b5f55/pydantic_graph-2.46.0-py3-none-any.whl", hash = "sha256:06edfa18ccfc9e3ea5b08791c6183da27cd9f25d11ef9e9d8057a0fb1d0b43d2", size = 52701, upload-time = "2026-09-19T04:06:05.287Z" },
 ]
 
 [[package]]
@@ -1330,6 +1331,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tomlkit"
+version = "0.15.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129, upload-time = "2026-07-17T01:48:04.562Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449, upload-time = "2026-07-17T01:48:05.728Z" },
+]
+
+[[package]]
 name = "trove-classifiers"
 version = "2026.6.1.19"
 source = { registry = "https://pypi.org/simple" }
@@ -1395,11 +1405,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.7.0"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909b5e40b1b90a496d987258916dbbf88e842c729f510e/urllib3-2.8.0.tar.gz", hash = "sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63", size = 458972, upload-time = "2026-09-15T19:29:36.253Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
+    { url = "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl", hash = "sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3", size = 135717, upload-time = "2026-09-15T19:29:34.577Z" },
 ]
 
 [[package]]
