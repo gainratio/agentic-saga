@@ -41,7 +41,7 @@ jev = [
   "typesafe-sdk==0.7.0",
 ]
 jev-openrouter = [
-  "openrouter==1.2.10",
+  "openrouter==1.2.22",
 ]
 
 [project.scripts]
@@ -50,7 +50,7 @@ agentic-saga = "agentic_saga.cli.main:entrypoint"
 [dependency-groups]
 dev = [
   "pydantic-ai-slim[openrouter]==2.46.0",
-  "openrouter==1.2.10",
+  "openrouter==1.2.22",
   "hatchling==1.32.4",
   "hypothesis>=6.130,<7",
   "mutmut>=3.6,<4",
