@@ -2,9 +2,11 @@
 
 ## TL;DR
 
-The agent chooses one currently eligible business capability. The deterministic Temporal workflow
-executes that choice and owns retries, reconciliation, reverse compensation, terminal proof, and
-verified human handling.
+The default decision engine is **Jev through OpenRouter**. It uses the same `OPENROUTER_API_KEY`
+as the Pydantic AI planner, so one key covers both. Calling Jev directly from TypeSafe
+(`TYPESAFE_API_KEY`) is the alternative. Whichever you pick, the agent only chooses one step that
+is allowed right now. The Temporal workflow runs that step and owns retries, lost-response checks,
+undo (compensation), final proof, and the hand-off to a person.
 
 The model never receives compensation or human-escalation controls. It sees `finish_saga` only
 after the workflow has fresh proof for `succeeded_verified`.
@@ -13,7 +15,7 @@ after the workflow has fresh proof for `succeeded_verified`.
 bounded public observation + eligible business schemas
                          |
                          v
-              Pydantic AI / OpenRouter
+   Jev via OpenRouter (default) / Jev direct / Pydantic AI
                          |
                          v
              typed, sequence-bound proposal
@@ -30,6 +32,137 @@ advertised tool with the right public arguments. Temporal integration tests sepa
 transaction correctness. A successful tool call is not evidence that a payment or rollback was
 correctly executed.
 
+## Where Jev fits
+
+Three pieces, three jobs:
+
+- **The saga** is the job itself: a list of steps, where every step that changes something has an
+  undo step. A checkout is reserve stock, then charge the card, then create the order. The undo
+  steps are cancel the order, refund the card, release the stock.
+- **Temporal** is the record keeper. It runs the saga as a durable state machine: every step and
+  its result is written to history, so a crash picks up where it stopped instead of charging twice.
+- **Jev** is the decision engine. On each turn your app builds a short list of complete, allowed
+  next steps (for example "charge the card for order 123"), and Jev picks one of them and says how
+  sure it is. It cannot invent a step or change its arguments.
+
+Jev does not decide how to undo. If the job cannot be proven done, the workflow undoes the finished
+steps newest-first on its own, and asks a person only when an undo cannot be proven.
+
+Jev runs inside the `agentic_saga.decide` Temporal Activity, never inside the workflow code.
+Temporal records the Activity's answer in history. When the workflow replays after a crash or a
+deploy, it reads that recorded answer instead of calling Jev again, so replay stays deterministic
+even though a model made the choice.
+
+## Default: Jev through OpenRouter
+
+Install the extra and set one key:
+
+```bash
+uv sync --extra jev-openrouter --group dev
+cp .env.example .env
+# Add your OPENROUTER_API_KEY to the ignored .env file, then export it in your shell.
+```
+
+This builds the Jev driver for the ecommerce example's checkout and hands it to the Temporal
+Activities. Run it from the repository root. Building the driver makes no network call; Jev is only
+called when a Temporal Worker runs the `agentic_saga.decide` Activity.
+
+```python
+from pathlib import Path
+
+from agentic_saga.agents import (
+    OpenRouterDecisionsSettings,
+    ProposalCandidate,
+    ToolCallIntent,
+    build_openrouter_decisions_driver,
+)
+from agentic_saga.contracts.runtime import ExecutionBudget
+from agentic_saga.manifest import load_saga_context
+from agentic_saga.temporal import TemporalActivities
+from examples.ecommerce.domain import ScenarioName
+from examples.ecommerce.provider import EcommerceProvider, build_registry
+
+registry = build_registry(EcommerceProvider(ScenarioName.HAPPY_PATH))
+context = load_saga_context(
+    Path("examples/ecommerce/saga.yaml"),
+    registry=registry,
+    invariant_checks=("no_external_effects", "obligations_reversed", "order_verified"),
+)
+
+
+async def candidates(observation, eligible_descriptors):
+    """Build every complete next step Jev may pick. Jev picks one; it never writes arguments."""
+    eligible = {descriptor.name for descriptor in eligible_descriptors}
+    if "verify_order" not in eligible:
+        return ()
+    return (
+        ProposalCandidate(
+            candidate_id="choice_00000001",
+            criteria="Verify the authoritative final order state.",
+            minimum_confidence=0.9,
+            proposal=ToolCallIntent(
+                tool_name="verify_order",
+                arguments={"order_id": "order_demo_001"},
+                rationale="Fresh success proof is required.",
+            ),
+        ),
+    )
+
+
+# Reads OPENROUTER_API_KEY. Pinned to typesafe/jev-1.13; zero data retention is required.
+driver = build_openrouter_decisions_driver(
+    context, candidates, OpenRouterDecisionsSettings.from_environment()
+)
+activities = TemporalActivities(
+    driver,
+    registry,
+    ExecutionBudget(turn_limit=6, tool_call_limit=4, elapsed_ms_limit=180_000, token_limit=6_000),
+)
+# Pass `activities` to agentic_saga.temporal.build_worker(...) to serve the workflow.
+```
+
+The route pins `typesafe/jev-1.13`, accepts only the response model `typesafe/jev-1.13-20260917`,
+and calls only `https://openrouter.ai/api/alpha/decisions`; it never falls back to chat
+completions. Every request asks OpenRouter for zero data retention and no data collection.
+
+## Alternative: Jev direct from TypeSafe
+
+Use this when you have a TypeSafe account and want no OpenRouter hop. Swap the builder and the key;
+the candidate function stays the same.
+
+```bash
+uv sync --extra jev --group dev
+export TYPESAFE_API_KEY=...   # your own key
+```
+
+```python
+from agentic_saga.agents import JevSettings, build_jev_driver
+
+driver = build_jev_driver(context, candidates, JevSettings.from_environment())
+```
+
+The direct route pins `jev-1.13.0` on `https://api.typesafe.ai` (override the version with
+`TYPESAFE_DEFAULT_MODEL`; moving aliases such as `jev-latest` are rejected).
+
+## What both Jev routes guarantee
+
+Both routes reject unknown or duplicate choices, malformed probabilities, non-finite confidence,
+low-confidence selections, private payloads, and stale proposals. A single legal candidate is
+selected locally without a paid request. Provider SDK retries are zero because Temporal owns retry
+policy. Both classify provider failures the same way (429 is rate limited, other 4xx is rejected,
+5xx is a server error, timeouts are transport failures).
+
+Install only the chosen transport and run its offline tests:
+
+```bash
+uv sync --extra jev-openrouter --group dev
+# or
+uv sync --extra jev --group dev
+
+uv run pytest tests/unit/agents/test_choice.py tests/unit/agents/test_jev.py \
+  tests/unit/agents/test_openrouter_decisions.py -q
+```
+
 ## Install and prove it offline
 
 ```bash
@@ -42,7 +175,10 @@ The last command strictly validates all 24 transaction fixtures and makes no mod
 The Pydantic AI/OpenRouter dependencies are optional; importing core Agentic Saga does not load
 them.
 
-## Pydantic AI with OpenRouter
+## Pydantic AI planner with OpenRouter
+
+Use this when you want a model to fill in tool arguments itself instead of choosing from a list
+your app builds. It shares the same `OPENROUTER_API_KEY`.
 
 ```python
 from agentic_saga.agents import OpenRouterSettings, build_openrouter_driver
@@ -79,59 +215,6 @@ Temporal owns retry policy.
 
 The default model is pinned to `openai/gpt-oss-120b`. A moving OpenRouter route such as
 `openrouter/auto`, `openrouter/free`, or a `latest` alias is rejected.
-
-## Bounded Jev choices
-
-Jev is useful when the application can materialize complete candidate proposals. It selects one
-opaque candidate ID and returns confidence plus probabilities; it does not invent tool arguments.
-
-```python
-from agentic_saga.agents import (
-    JevSettings,
-    ProposalCandidate,
-    ToolCallIntent,
-    build_jev_driver,
-)
-
-
-async def candidates(observation, eligible_descriptors):
-    order_id = observation.goal.context["order_id"]
-    eligible = {descriptor.name for descriptor in eligible_descriptors}
-    if "verify_order" not in eligible:
-        return ()
-    return (
-        ProposalCandidate(
-            candidate_id="choice_00000001",
-            criteria="Verify the authoritative final order state.",
-            minimum_confidence=0.9,
-            proposal=ToolCallIntent(
-                tool_name="verify_order",
-                arguments={"order_id": order_id},
-                rationale="Fresh success proof is required.",
-            ),
-        ),
-    )
-
-
-driver = build_jev_driver(context, candidates, JevSettings.from_environment())
-```
-
-The direct route pins `jev-1.13.0`. The OpenRouter Decisions route pins
-`typesafe/jev-1.13` and calls only `https://openrouter.ai/api/alpha/decisions`; it never falls back
-to chat completions. Both reject unknown or duplicate choices, malformed probabilities, non-finite
-confidence, low-confidence selections, private payloads, and stale proposals. A single legal
-candidate is selected locally without a paid request.
-
-Install only the chosen transport:
-
-```bash
-uv sync --extra jev --group dev
-# or
-uv sync --extra jev-openrouter --group dev
-
-uv run pytest tests/unit/agents/test_choice.py tests/unit/agents/test_jev.py \
-  tests/unit/agents/test_openrouter_decisions.py -q
-```
 
 ## Opt-in live model evaluation
 

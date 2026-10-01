@@ -23,6 +23,11 @@ All notable changes to Agentic Saga are documented here. The format follows
 - Pydantic AI with a pinned OpenRouter tool-calling route for optional agentic decisions.
 - Optional TypeSafe AI Jev and OpenRouter Decisions adapters for bounded selection among
   application-built candidates.
+- Jev through OpenRouter is now the documented default decision engine (one
+  `OPENROUTER_API_KEY` shared with the Pydantic AI planner), with a runnable example that a test
+  executes; the direct TypeSafe route is documented as the alternative.
+- `agentic_saga.agents.failures.classify_http_status`: one HTTP status classifier shared by the
+  Jev, OpenRouter Decisions, and Pydantic AI adapters, pinned by characterization tests.
 - Public `saga.yaml` context manifests with bounded parsing, registered-name validation, catalog
   digests, budgets, safety guidance, and example paths.
 - An accessible Flight Recorder that replays four redacted ecommerce traces with a perceptible
