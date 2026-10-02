@@ -1,6 +1,10 @@
 version: 2
+# Every ecosystem is grouped (`patterns: ["*"]`) so each weekly run opens ONE PR
+# per ecosystem instead of one PR per dependency. Python uses the `uv`
+# ecosystem, not `pip`: `pip` bumped pyproject pins without relocking uv.lock,
+# so its PRs were never installed or tested under the locked environment.
 updates:
-  - package-ecosystem: pip
+  - package-ecosystem: uv
     directory: "/"
     schedule:
       interval: weekly
@@ -8,9 +12,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
     labels:
       - dependencies
-      - pip
+      - python
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -19,6 +26,9 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
     labels:
       - dependencies
       - github-actions
