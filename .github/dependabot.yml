@@ -15,6 +15,7 @@ updates:
     groups:
       python:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     labels:
       - dependencies
       - python
@@ -29,6 +30,7 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     labels:
       - dependencies
       - github-actions
