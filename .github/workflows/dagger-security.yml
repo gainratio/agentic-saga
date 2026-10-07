@@ -25,4 +25,4 @@ jobs:
           version: "0.21.8"
           verb: call
           args: >-
-            security --commit-sha=${{ github.sha }} ${USE_GIT_AUTH:+--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER}
+            security --commit-sha=${{ github.sha }} --repository=${{ github.repository }} ${USE_GIT_AUTH:+--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER}
