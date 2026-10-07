@@ -58,6 +58,7 @@ NODE_PATHS = (
 FRONTEND_LOCK_INPUTS = (
     "web/flight-recorder/package.json",
     "web/flight-recorder/pnpm-lock.yaml",
+    "web/flight-recorder/pnpm-workspace.yaml",
 )
 VALID_MANIFEST = "\n".join(
     (
