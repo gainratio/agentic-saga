@@ -29,8 +29,11 @@ NODE_IMAGE: Final = (
     "node:24.6.0-bookworm-slim@sha256:"
     "9b741b28148b0195d62fa456ed84dd6c953c1f17a3761f3e6e6797a754d9edff"
 )
+#: Today's identity, and the default so existing callers behave exactly as before.
 REPOSITORY: Final = "hseshadr/agentic-saga"
-REPOSITORY_URL: Final = "https://github.com/hseshadr/agentic-saga.git"
+#: The run's `github.repository` must be exactly one of these: today's owner or the
+#: gainratio transfer target. Exact membership, never an owner or suffix pattern.
+ALLOWED_REPOSITORIES: Final = ("hseshadr/agentic-saga", "gainratio/agentic-saga")
 SOURCE_ROOT: Final = "/src"
 WEB_ROOT: Final = "/src/web/flight-recorder"
 RELEASE_ROOT: Final = "/src/dist/release"
@@ -138,14 +141,24 @@ async def _bounded_gather[ResultT](
         raise
 
 
+def allowed_repository(repository: str) -> str:
+    """Return the run's repository identity only if it is exactly allow-listed."""
+    if repository not in ALLOWED_REPOSITORIES:
+        allowed = ", ".join(ALLOWED_REPOSITORIES)
+        message = f"{repository!r} is not an allowed agentic-saga repository ({allowed})"
+        raise ValueError(message)
+    return repository
+
+
 async def _guard(
     source: dagger.Directory,
     commit_sha: str,
     git_auth_header: dagger.Secret | None,
+    repository: str,
 ) -> None:
     guard = dag.foundation().guard(
         source=source,
-        repository=REPOSITORY,
+        repository=repository,
         commit_sha=commit_sha,
         http_auth_header=git_auth_header,
     )
@@ -156,20 +169,23 @@ async def _release_source(
     source: dagger.Directory,
     commit_sha: str,
     git_auth_header: dagger.Secret | None,
+    repository: str,
 ) -> dagger.Directory:
-    await _guard(source, commit_sha, git_auth_header)
-    repository = dag.git(REPOSITORY_URL, http_auth_header=git_auth_header)
-    return repository.commit(commit_sha).tree(depth=0, include_tags=True)
+    identity = allowed_repository(repository)
+    await _guard(source, commit_sha, git_auth_header, identity)
+    remote = dag.git(f"https://github.com/{identity}.git", http_auth_header=git_auth_header)
+    return remote.commit(commit_sha).tree(depth=0, include_tags=True)
 
 
 async def _dependency_audit(
     source: dagger.Directory,
     commit_sha: str,
     git_auth_header: dagger.Secret | None,
+    repository: str,
 ) -> None:
     audit = dag.python_package().dependency_audit(
         source=source,
-        repository=REPOSITORY,
+        repository=allowed_repository(repository),
         commit_sha=commit_sha,
         http_auth_header=git_auth_header,
     )
@@ -389,9 +405,10 @@ class AgenticSaga:
         self,
         commit_sha: str,
         git_auth_header: dagger.Secret | None = None,
+        repository: str = REPOSITORY,
     ) -> str:
         """Run guarded Temporal, frontend, and measured release gates."""
-        verified = await _release_source(self.source, commit_sha, git_auth_header)
+        verified = await _release_source(self.source, commit_sha, git_auth_header, repository)
         artifacts, frontend = await _shared_outputs(verified)
         await _runtime_matrix(verified, artifacts, frontend)
         manifest = await _artifact_manifest(artifacts)
@@ -402,9 +419,10 @@ class AgenticSaga:
         self,
         commit_sha: str,
         git_auth_header: dagger.Secret | None = None,
+        repository: str = REPOSITORY,
     ) -> str:
         """Run guarded locked Python and frontend dependency audits."""
-        verified = await _release_source(self.source, commit_sha, git_auth_header)
-        await _dependency_audit(verified, commit_sha, git_auth_header)
+        verified = await _release_source(self.source, commit_sha, git_auth_header, repository)
+        await _dependency_audit(verified, commit_sha, git_auth_header, repository)
         await _node(verified).with_exec(["pnpm", "audit"]).sync()
         return "Agentic Saga dependency audits passed"

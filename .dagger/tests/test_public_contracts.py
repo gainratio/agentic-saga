@@ -69,6 +69,7 @@ VALID_MANIFEST = "\n".join(
 PUBLIC_INPUTS = (
     ("commit_sha", "str"),
     ("git_auth_header", "dagger.Secret | None"),
+    ("repository", "str"),
 )
 AUTH_ARGUMENT = "--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER"
 AUTH_PREDICATE = (
@@ -223,8 +224,8 @@ def _assert_frontend_runtime_contract(source: str) -> None:
 def _assert_public_schema(source: str) -> None:
     actual = tuple(_signature(method) for method in _public_methods(_adapter_class(_tree(source))))
     expected = (
-        ("ci", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
-        ("security", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
+        ("ci", (), PUBLIC_INPUTS, None, (), None, (2, 0), "str"),
+        ("security", (), PUBLIC_INPUTS, None, (), None, (2, 0), "str"),
     )
     assert actual == expected, "only ci and security may be public Dagger functions"
 
@@ -293,7 +294,10 @@ def _assert_workflow_boundary(name: str, workflow: str) -> None:
         for step in steps
         if step.get("uses") == f"dagger/dagger-for-github@{DAGGER_ACTION_SHA}"
     ]
-    expected_args = f"{argument} --commit-sha=${{{{ github.sha }}}} {SAFE_AUTH_ARGUMENT}"
+    expected_args = (
+        f"{argument} --commit-sha=${{{{ github.sha }}}} "
+        f"--repository=${{{{ github.repository }}}} {SAFE_AUTH_ARGUMENT}"
+    )
     arguments = [
         cast(dict[str, str], step["with"])["args"]
         for step in steps
@@ -710,14 +714,14 @@ def test_should_preserve_thin_pinned_workflow_ingress(name: str) -> None:
     ("private", "event_name", "head_repository", "secret_available", "expected"),
     (
         (True, "push", None, True, True),
-        (True, "pull_request", "hseshadr/agentic-saga", True, True),
+        (True, "pull_request", "SELF", True, True),
         (True, "pull_request", "contributor/agentic-saga", True, False),
         (True, "schedule", None, True, True),
         (True, "workflow_dispatch", None, True, True),
         (True, "push", None, False, False),
-        (True, "pull_request", "hseshadr/agentic-saga", False, False),
+        (True, "pull_request", "SELF", False, False),
         (False, "push", None, True, False),
-        (False, "pull_request", "hseshadr/agentic-saga", True, False),
+        (False, "pull_request", "SELF", True, False),
         (False, "pull_request", "contributor/agentic-saga", True, False),
         (False, "schedule", None, True, False),
         (False, "workflow_dispatch", None, True, False),
@@ -731,16 +735,19 @@ def test_should_select_auth_only_for_private_trusted_events(
     expected: bool,
 ) -> None:
     # Given the repository visibility and event identity used by the exact workflow expression.
-    trusted = event_name != "pull_request" or head_repository == main.REPOSITORY
+    # The run's own repository (hseshadr today, gainratio after transfer) is "SELF".
+    for run_repository in main.ALLOWED_REPOSITORIES:
+        head = run_repository if head_repository == "SELF" else head_repository
+        trusted = event_name != "pull_request" or head == run_repository
 
-    # When the authentication selection contract is evaluated.
-    selected = private and trusted and secret_available
-    secret = "masked-secret" if secret_available else ""
-    environment = secret if selected else ""
+        # When the authentication selection contract is evaluated.
+        selected = private and trusted and secret_available
+        secret = "masked-secret" if secret_available else ""
+        environment = secret if selected else ""
 
-    # Then public, external-fork, and no-secret events receive neither auth surface.
-    assert selected is expected
-    assert environment == (secret if expected else "")
+        # Then public, external-fork, and no-secret events receive neither auth surface.
+        assert selected is expected
+        assert environment == (secret if expected else "")
 
 
 @pytest.mark.parametrize(
@@ -864,7 +871,7 @@ def _assert_shared_build_contract(module: ModuleType, monkeypatch: pytest.Monkey
 def test_should_reject_missing_exact_source_resolution() -> None:
     # Given a copied adapter that bypasses canonical source resolution.
     source = MODULE.read_text().replace(
-        "verified = await _release_source(self.source, commit_sha, git_auth_header)",
+        "verified = await _release_source(self.source, commit_sha, git_auth_header, repository)",
         "verified = self.source",
     )
 
@@ -935,7 +942,8 @@ def test_should_orchestrate_ci_with_plain_async_collaborators(
     source, verified, artifacts, frontend = object(), object(), object(), object()
     events: list[str] = []
 
-    async def resolve(received: object, commit_sha: str, auth: object) -> object:
+    async def resolve(received: object, commit_sha: str, auth: object, repository: str) -> object:
+        assert repository == main.REPOSITORY
         assert (received, commit_sha, auth) == (source, "a" * 40, auth_header)
         events.append("resolve")
         return verified
@@ -1065,3 +1073,139 @@ def test_should_reject_a_copied_bounded_gather_that_returns_exceptions(
     # Then converting that exception to a gather result is rejected.
     with pytest.raises(pytest.fail.Exception):
         _assert_runtime_failure_propagates(module)
+
+
+# Run identity: after the gainratio transfer, `github.repository` and the canonical API
+# `full_name` become `gainratio/agentic-saga`. The guard must use the run's identity,
+# accepted only by exact membership in a two-item allow-list.
+HSESHADR_REPOSITORY = "hseshadr/agentic-saga"
+GAINRATIO_REPOSITORY = "gainratio/agentic-saga"
+REFUSED_REPOSITORIES = (
+    "attacker/agentic-saga",
+    "gainratio/other-repo",
+    "hseshadr/agentic-saga-evil",
+    "gainratio-evil/agentic-saga",
+    "",
+)
+
+
+class _RecordingDag:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def foundation(self) -> _RecordingDag:
+        return self
+
+    def python_package(self) -> _RecordingDag:
+        return self
+
+    def guard(self, **kwargs: object) -> _RecordingDag:
+        self.calls.append(("guard", str(kwargs["repository"])))
+        return self
+
+    def dependency_audit(self, **kwargs: object) -> _RecordingDag:
+        self.calls.append(("dependency_audit", str(kwargs["repository"])))
+        return self
+
+    def git(self, url: str, **_: object) -> _RecordingDag:
+        self.calls.append(("git", url))
+        return self
+
+    def commit(self, _sha: str) -> _RecordingDag:
+        return self
+
+    def tree(self, **_: object) -> str:
+        return "verified-tree"
+
+    async def sync(self) -> None:
+        return None
+
+
+def test_should_allow_exactly_the_hseshadr_and_gainratio_repositories() -> None:
+    # Given the adapter's literal identity allow-list.
+    # When it is read.
+    # Then it holds exactly today's owner and the transfer target, with today's as default.
+    assert main.ALLOWED_REPOSITORIES == (HSESHADR_REPOSITORY, GAINRATIO_REPOSITORY)
+    assert main.REPOSITORY == HSESHADR_REPOSITORY
+
+
+@pytest.mark.parametrize("repository", (HSESHADR_REPOSITORY, GAINRATIO_REPOSITORY))
+def test_should_accept_an_allowed_run_repository(repository: str) -> None:
+    # Given a run repository identity owned by hseshadr or gainratio.
+    # When it is validated.
+    # Then it is returned unchanged.
+    assert main.allowed_repository(repository) == repository
+
+
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_refuse_any_other_run_repository(repository: str) -> None:
+    # Given a fork, another owner, another repository, a look-alike, or no identity.
+    # When it is validated.
+    # Then it is refused by exact membership, never by owner or suffix pattern.
+    with pytest.raises(ValueError, match="not an allowed agentic-saga repository"):
+        main.allowed_repository(repository)
+
+
+@pytest.mark.parametrize("repository", (HSESHADR_REPOSITORY, GAINRATIO_REPOSITORY))
+def test_should_guard_and_fetch_the_run_repository(
+    monkeypatch: pytest.MonkeyPatch, repository: str
+) -> None:
+    # Given a recording Dagger client and an allowed run repository.
+    recorder = _RecordingDag()
+    monkeypatch.setattr(main, "dag", recorder)
+    source = cast(Directory, object())
+
+    # When exact source is resolved and the dependency audit runs for that identity.
+    tree = asyncio.run(main._release_source(source, "a" * 40, None, repository))
+    asyncio.run(main._dependency_audit(source, "a" * 40, None, repository))
+
+    # Then the guard, the exact-source fetch, and the audit all use the run identity.
+    assert tree == "verified-tree"
+    assert recorder.calls == [
+        ("guard", repository),
+        ("git", f"https://github.com/{repository}.git"),
+        ("dependency_audit", repository),
+    ]
+
+
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_refuse_before_any_dagger_call(
+    monkeypatch: pytest.MonkeyPatch, repository: str
+) -> None:
+    # Given a recording Dagger client and a refused run repository.
+    recorder = _RecordingDag()
+    monkeypatch.setattr(main, "dag", recorder)
+    source = cast(Directory, object())
+
+    # When exact source resolution or the audit is attempted.
+    # Then each refuses before the guard, fetch, or audit is ever called.
+    with pytest.raises(ValueError, match="not an allowed agentic-saga repository"):
+        asyncio.run(main._release_source(source, "a" * 40, None, repository))
+    with pytest.raises(ValueError, match="not an allowed agentic-saga repository"):
+        asyncio.run(main._dependency_audit(source, "a" * 40, None, repository))
+    assert recorder.calls == []
+
+
+@pytest.mark.parametrize("verb", ("ci", "security"))
+def test_should_pass_the_run_repository_from_each_public_function(
+    monkeypatch: pytest.MonkeyPatch, verb: str
+) -> None:
+    # Given public functions whose source resolution records its identity and stops.
+    seen: list[str] = []
+
+    async def stop(_s: object, _c: str, _a: object, repository: str) -> None:
+        seen.append(repository)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(main, "_release_source", stop)
+    saga = main.AgenticSaga.__new__(main.AgenticSaga)
+    saga.source = cast(Directory, object())
+    function = getattr(saga, verb)
+
+    # When each is called with the gainratio identity and with the default.
+    for call in (function("a" * 40, repository=GAINRATIO_REPOSITORY), function("a" * 40)):
+        with pytest.raises(RuntimeError, match="stop"):
+            asyncio.run(call)
+
+    # Then the run identity reaches the guard and the default stays today's owner.
+    assert seen == [GAINRATIO_REPOSITORY, HSESHADR_REPOSITORY]

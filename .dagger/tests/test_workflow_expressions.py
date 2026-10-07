@@ -24,6 +24,7 @@ ATTACKER_EXPRESSIONS = ("${{ inputs.", "${{ github.event.", "${{ github.head_ref
 ENV_ONLY_INPUTS = frozenset({"module"})
 AUTH_ARGUMENT = "--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER"
 COMMIT_SHA = "a" * 40
+RUN_REPOSITORY = "gainratio/agentic-saga"
 #: USE_GIT_AUTH values a hostile or broken environment could carry.
 HOSTILE_SWITCHES = (
     "true",
@@ -63,10 +64,12 @@ def _script_inputs() -> list[tuple[str, str, str]]:
 
 
 def _expand_like_the_action(args: str, switch: str, cwd: Path) -> list[str]:
-    """Render `${{ github.sha }}` as Actions does, then let bash expand the args."""
+    """Render `${{ github.sha }}`/`${{ github.repository }}` as Actions does, then expand."""
     bash = shutil.which("bash")
     assert bash is not None
-    rendered = args.replace("${{ github.sha }}", COMMIT_SHA)
+    rendered = args.replace("${{ github.sha }}", COMMIT_SHA).replace(
+        "${{ github.repository }}", RUN_REPOSITORY
+    )
     result = subprocess.run(  # noqa: S603 - fixed bash, test-owned argv
         [bash, "-c", f"printf '%s\\0' {rendered}"],
         env={"USE_GIT_AUTH": switch, "PATH": "/usr/bin:/bin"},
@@ -106,7 +109,7 @@ def test_should_omit_git_auth_when_the_switch_is_empty(
     argv = _expand_like_the_action(args, "", tmp_path)
 
     # Then Dagger receives no auth argument at all.
-    assert argv == [verb, f"--commit-sha={COMMIT_SHA}"]
+    assert argv == [verb, f"--commit-sha={COMMIT_SHA}", f"--repository={RUN_REPOSITORY}"]
 
 
 @pytest.mark.parametrize("switch", HOSTILE_SWITCHES)
@@ -123,5 +126,10 @@ def test_should_turn_any_non_empty_switch_into_only_the_fixed_auth_argument(
     argv = _expand_like_the_action(args, switch, tmp_path)
 
     # Then the value is only a presence test: Dagger gets the fixed literal and bash ran nothing.
-    assert argv == [verb, f"--commit-sha={COMMIT_SHA}", AUTH_ARGUMENT]
+    assert argv == [
+        verb,
+        f"--commit-sha={COMMIT_SHA}",
+        f"--repository={RUN_REPOSITORY}",
+        AUTH_ARGUMENT,
+    ]
     assert not (tmp_path / "pwned").exists()
