@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import importlib.util
+import inspect
 import json
 import shutil
 import subprocess
@@ -69,8 +70,8 @@ VALID_MANIFEST = "\n".join(
 )
 PUBLIC_INPUTS = (
     ("commit_sha", "str"),
-    ("git_auth_header", "dagger.Secret | None"),
     ("repository", "str"),
+    ("git_auth_header", "dagger.Secret | None"),
 )
 AUTH_ARGUMENT = "--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER"
 AUTH_PREDICATE = (
@@ -225,8 +226,8 @@ def _assert_frontend_runtime_contract(source: str) -> None:
 def _assert_public_schema(source: str) -> None:
     actual = tuple(_signature(method) for method in _public_methods(_adapter_class(_tree(source))))
     expected = (
-        ("ci", (), PUBLIC_INPUTS, None, (), None, (2, 0), "str"),
-        ("security", (), PUBLIC_INPUTS, None, (), None, (2, 0), "str"),
+        ("ci", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
+        ("security", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
     )
     assert actual == expected, "only ci and security may be public Dagger functions"
 
@@ -736,7 +737,7 @@ def test_should_select_auth_only_for_private_trusted_events(
     expected: bool,
 ) -> None:
     # Given the repository visibility and event identity used by the exact workflow expression.
-    # The run's own repository (hseshadr today, gainratio after transfer) is "SELF".
+    # The run's own repository (gainratio, or hseshadr mid-move) is "SELF".
     for run_repository in main.ALLOWED_REPOSITORIES:
         head = run_repository if head_repository == "SELF" else head_repository
         trusted = event_name != "pull_request" or head == run_repository
@@ -944,7 +945,7 @@ def test_should_orchestrate_ci_with_plain_async_collaborators(
     events: list[str] = []
 
     async def resolve(received: object, commit_sha: str, auth: object, repository: str) -> object:
-        assert repository == main.REPOSITORY
+        assert repository == GAINRATIO_REPOSITORY
         assert (received, commit_sha, auth) == (source, "a" * 40, auth_header)
         events.append("resolve")
         return verified
@@ -969,7 +970,7 @@ def test_should_orchestrate_ci_with_plain_async_collaborators(
     monkeypatch.setattr(main, "_artifact_manifest", manifest, raising=False)
 
     # When public CI is awaited.
-    result = asyncio.run(_saga(source).ci("a" * 40, auth_header))
+    result = asyncio.run(_saga(source).ci("a" * 40, GAINRATIO_REPOSITORY, auth_header))
 
     # Then the resolved source flows into both later orchestration phases.
     assert result == f"Agentic Saga canonical Dagger gate passed\nSHA256SUMS\n{VALID_MANIFEST}"
@@ -993,7 +994,7 @@ def test_should_propagate_security_audit_failure_before_frontend_work(
     # When the public security entry point is awaited.
     # Then its dependency-audit failure remains visible without starting a Dagger container.
     with pytest.raises(RuntimeError, match="locked audit failed"):
-        asyncio.run(_saga(dag.directory()).security("a" * 40, object()))
+        asyncio.run(_saga(dag.directory()).security("a" * 40, GAINRATIO_REPOSITORY, object()))
 
 
 def test_should_create_shared_outputs_from_real_lazy_dagger_containers(
@@ -1076,11 +1077,12 @@ def test_should_reject_a_copied_bounded_gather_that_returns_exceptions(
         _assert_runtime_failure_propagates(module)
 
 
-# Run identity: after the gainratio transfer, `github.repository` and the canonical API
-# `full_name` become `gainratio/agentic-saga`. The guard must use the run's identity,
+# Run identity: since the gainratio transfer, `github.repository` and the canonical API
+# `full_name` are `gainratio/agentic-saga`. The guard must use the run's identity,
 # accepted only by exact membership in a two-item allow-list.
-HSESHADR_REPOSITORY = "hseshadr/agentic-saga"
 GAINRATIO_REPOSITORY = "gainratio/agentic-saga"
+# Kept until the org move finishes (plan phase 2 step 8 drops it).
+HSESHADR_REPOSITORY = "hseshadr/agentic-saga"
 REFUSED_REPOSITORIES = (
     "attacker/agentic-saga",
     "gainratio/other-repo",
@@ -1122,12 +1124,21 @@ class _RecordingDag:
         return None
 
 
-def test_should_allow_exactly_the_hseshadr_and_gainratio_repositories() -> None:
+def test_should_allow_exactly_the_gainratio_and_pre_transfer_repositories() -> None:
     # Given the adapter's literal identity allow-list.
     # When it is read.
-    # Then it holds exactly today's owner and the transfer target, with today's as default.
-    assert main.ALLOWED_REPOSITORIES == (HSESHADR_REPOSITORY, GAINRATIO_REPOSITORY)
-    assert main.REPOSITORY == HSESHADR_REPOSITORY
+    # Then it holds the canonical gainratio owner first, then the pre-transfer owner.
+    assert main.ALLOWED_REPOSITORIES == (GAINRATIO_REPOSITORY, HSESHADR_REPOSITORY)
+
+
+def test_should_have_no_default_identity_to_fall_back_on() -> None:
+    # Given the adapter module and its public Dagger functions.
+    # When their identity inputs are inspected.
+    # Then no stale owner constant exists and every caller must pass `github.repository`.
+    assert not hasattr(main, "REPOSITORY")
+    for verb in ("ci", "security"):
+        parameter = inspect.signature(getattr(main.AgenticSaga, verb)).parameters["repository"]
+        assert parameter.default is inspect.Parameter.empty, verb
 
 
 @pytest.mark.parametrize("repository", (HSESHADR_REPOSITORY, GAINRATIO_REPOSITORY))
@@ -1203,10 +1214,10 @@ def test_should_pass_the_run_repository_from_each_public_function(
     saga.source = cast(Directory, object())
     function = getattr(saga, verb)
 
-    # When each is called with the gainratio identity and with the default.
-    for call in (function("a" * 40, repository=GAINRATIO_REPOSITORY), function("a" * 40)):
+    # When each is called with the gainratio and the pre-transfer identity.
+    for repository in (GAINRATIO_REPOSITORY, HSESHADR_REPOSITORY):
         with pytest.raises(RuntimeError, match="stop"):
-            asyncio.run(call)
+            asyncio.run(function("a" * 40, repository=repository))
 
-    # Then the run identity reaches the guard and the default stays today's owner.
+    # Then the run identity reaches the guard unchanged.
     assert seen == [GAINRATIO_REPOSITORY, HSESHADR_REPOSITORY]

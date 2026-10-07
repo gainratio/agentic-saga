@@ -29,11 +29,10 @@ NODE_IMAGE: Final = (
     "node:24.6.0-bookworm-slim@sha256:"
     "9b741b28148b0195d62fa456ed84dd6c953c1f17a3761f3e6e6797a754d9edff"
 )
-#: Today's identity, and the default so existing callers behave exactly as before.
-REPOSITORY: Final = "hseshadr/agentic-saga"
-#: The run's `github.repository` must be exactly one of these: today's owner or the
-#: gainratio transfer target. Exact membership, never an owner or suffix pattern.
-ALLOWED_REPOSITORIES: Final = ("hseshadr/agentic-saga", "gainratio/agentic-saga")
+#: The run's `github.repository` must be exactly one of these: the canonical gainratio
+#: owner, or the pre-transfer identity until the org move finishes. Exact membership,
+#: never an owner or suffix pattern. There is deliberately no default to fall back on.
+ALLOWED_REPOSITORIES: Final = ("gainratio/agentic-saga", "hseshadr/agentic-saga")
 SOURCE_ROOT: Final = "/src"
 WEB_ROOT: Final = "/src/web/flight-recorder"
 RELEASE_ROOT: Final = "/src/dist/release"
@@ -405,8 +404,8 @@ class AgenticSaga:
     async def ci(
         self,
         commit_sha: str,
+        repository: str,
         git_auth_header: dagger.Secret | None = None,
-        repository: str = REPOSITORY,
     ) -> str:
         """Run guarded Temporal, frontend, and measured release gates."""
         verified = await _release_source(self.source, commit_sha, git_auth_header, repository)
@@ -419,8 +418,8 @@ class AgenticSaga:
     async def security(
         self,
         commit_sha: str,
+        repository: str,
         git_auth_header: dagger.Secret | None = None,
-        repository: str = REPOSITORY,
     ) -> str:
         """Run guarded locked Python and frontend dependency audits."""
         verified = await _release_source(self.source, commit_sha, git_auth_header, repository)

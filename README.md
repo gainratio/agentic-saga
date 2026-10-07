@@ -2,10 +2,10 @@
 
 A Python library that lets an AI agent run multi-step jobs like a checkout, and undoes finished steps if one fails.
 
-**Try it:** `git clone https://github.com/hseshadr/agentic-saga && cd agentic-saga && uv sync --group dev`, then follow [Try it](#try-it).
+**Try it:** `git clone https://github.com/gainratio/agentic-saga && cd agentic-saga && uv sync --group dev`, then follow [Try it](#try-it).
 
-[![CI](https://github.com/hseshadr/agentic-saga/actions/workflows/dagger.yml/badge.svg)](https://github.com/hseshadr/agentic-saga/actions/workflows/dagger.yml)
-[![License](https://img.shields.io/github/license/hseshadr/agentic-saga)](LICENSE)
+[![CI](https://github.com/gainratio/agentic-saga/actions/workflows/dagger.yml/badge.svg)](https://github.com/gainratio/agentic-saga/actions/workflows/dagger.yml)
+[![License](https://img.shields.io/github/license/gainratio/agentic-saga)](LICENSE)
 
 A checkout touches several outside services: reserve the stock, charge the card, book the
 delivery. If the delivery company says no after the card was charged, someone has to refund the
@@ -30,7 +30,7 @@ so no AI model is called.
 1. Get the code and install it:
 
    ```bash
-   git clone https://github.com/hseshadr/agentic-saga.git
+   git clone https://github.com/gainratio/agentic-saga.git
    cd agentic-saga
    uv sync --group dev
    ```
@@ -159,7 +159,7 @@ through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or the scripted d
 Not on PyPI yet. Install from source with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone https://github.com/hseshadr/agentic-saga.git
+git clone https://github.com/gainratio/agentic-saga.git
 cd agentic-saga
 uv sync --group dev                         # library, tests, and the example
 uv sync --extra agent --group dev           # + Pydantic AI through OpenRouter

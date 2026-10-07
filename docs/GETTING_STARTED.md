@@ -30,7 +30,7 @@ Local traps we hit:
 ## 2. Clone, install, run
 
 ```bash
-git clone https://github.com/hseshadr/agentic-saga.git   # 2 s
+git clone https://github.com/gainratio/agentic-saga.git   # 2 s
 cd agentic-saga
 uv sync --group dev                                        # 7 s with an empty uv cache
 ```

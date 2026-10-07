@@ -4,6 +4,6 @@ type: software
 authors:
   - family-names: Seshadri
     given-names: Harish
-repository-code: https://github.com/hseshadr/agentic-saga
+repository-code: https://github.com/gainratio/agentic-saga
 license: MIT
 version: 0.1.0
