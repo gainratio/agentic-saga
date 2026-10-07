@@ -27,10 +27,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hseshadr/agentic-saga"
-Documentation = "https://github.com/hseshadr/agentic-saga#readme"
-Repository = "https://github.com/hseshadr/agentic-saga"
-Issues = "https://github.com/hseshadr/agentic-saga/issues"
+Homepage = "https://github.com/gainratio/agentic-saga"
+Documentation = "https://github.com/gainratio/agentic-saga#readme"
+Repository = "https://github.com/gainratio/agentic-saga"
+Issues = "https://github.com/gainratio/agentic-saga/issues"
 
 [project.optional-dependencies]
 agent = [

@@ -89,7 +89,7 @@ def test_title_and_first_line_match_the_package_description() -> None:
 def test_fastest_way_to_try_it_is_bold_right_under_the_first_line() -> None:
     try_line = _lines()[1]
     assert try_line.startswith("**")
-    assert "git clone https://github.com/hseshadr/agentic-saga" in try_line
+    assert "git clone https://github.com/gainratio/agentic-saga" in try_line
 
 
 def test_intro_has_few_badges_and_a_technical_docs_line() -> None:
