@@ -1,0 +1,12 @@
+# Security dependency overrides. pnpm v10+ reads `overrides` from this file, not
+# from the package.json `pnpm` field (which v11 ignores). Dagger copies this file
+# into the locked install layer (FRONTEND_LOCK_INPUTS) so `--frozen-lockfile`
+# sees the same overrides the lockfile was resolved with.
+#
+#   source-map-js: floor >=1.2.2 for GHSA-68fv-2mgg-jv7q / CVE-2026-93749 (HIGH -
+#     event-loop DoS through indexed source-map section offsets; vulnerable
+#     >=1.0.0 <1.2.2, patched 1.2.2). Dev/test-only path through vite, vitest and
+#     jsdom>css-tree; every consumer declares `^1.x`, so the range admits the fix
+#     and the lock had frozen 1.2.1. Bounded `<2` to stay on the consumed major.
+overrides:
+  source-map-js: ">=1.2.2 <2"

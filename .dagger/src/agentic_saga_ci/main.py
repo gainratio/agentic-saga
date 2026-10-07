@@ -45,6 +45,7 @@ PYTHON_LOCK_INPUTS: Final = ("pyproject.toml", "uv.lock")
 FRONTEND_LOCK_INPUTS: Final = (
     "web/flight-recorder/package.json",
     "web/flight-recorder/pnpm-lock.yaml",
+    "web/flight-recorder/pnpm-workspace.yaml",
 )
 RUNTIME_WHEELHOUSES: Final = (
     "/src/dist/release/wheelhouses/3.12",
