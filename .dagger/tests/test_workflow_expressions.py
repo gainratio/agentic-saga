@@ -2,7 +2,7 @@
 
 dagger-for-github pastes every `with:` input except `module` into a bash script. An
 expression there is rendered before bash runs, so any value an event author can shape
-becomes shell text. hseshadr/ci's fleet rule `dagger-args-expression` rejects it. Values
+becomes shell text. gainratio/ci's fleet rule `dagger-args-expression` rejects it. Values
 arrive through `env:` instead, and the args only test or quote the variable.
 """
 

@@ -270,12 +270,12 @@ def _assert_module_dependencies(config: str) -> None:
     expected = [
         {
             "name": "foundation",
-            "source": f"github.com/hseshadr/ci/modules/portfolio-foundation@{FOUNDATION_SHA}",
+            "source": f"github.com/gainratio/ci/modules/portfolio-foundation@{FOUNDATION_SHA}",
             "pin": FOUNDATION_SHA,
         },
         {
             "name": "python-package",
-            "source": f"github.com/hseshadr/ci/modules/python-package@{FOUNDATION_SHA}",
+            "source": f"github.com/gainratio/ci/modules/python-package@{FOUNDATION_SHA}",
             "pin": FOUNDATION_SHA,
         },
     ]
