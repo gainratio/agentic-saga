@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import cast
@@ -348,6 +349,16 @@ def test_recorder_readiness_is_bounded_and_process_is_stopped(tmp_path: Path) ->
     cli.chmod(0o755)
 
     assert runner._recorder_ready(cli)
+
+
+def test_ready_line_rejects_a_binary_stdout() -> None:
+    with (
+        subprocess.Popen(
+            (sys.executable, "-c", "print('ready')"), stdout=subprocess.PIPE
+        ) as process,
+        pytest.raises(TypeError, match="recorder stdout must be text"),
+    ):
+        runner._read_ready_line(cast(subprocess.Popen[str], process))
 
 
 def test_stop_process_escalates_after_timeout() -> None:
