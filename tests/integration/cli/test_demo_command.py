@@ -216,8 +216,9 @@ def _read_server_url(process: subprocess.Popen[str]) -> str:
     assert process.stdout is not None
     ready, _, _ = select.select([process.stdout], [], [], 10)
     assert ready, _process_error(process)
-    line = process.stdout.readline().strip()
-    return line.removeprefix("Agentic Saga recorder: ")
+    line = process.stdout.readline()
+    assert isinstance(line, str), "recorder stdout must be text"
+    return line.strip().removeprefix("Agentic Saga recorder: ")
 
 
 def _process_error(process: subprocess.Popen[str]) -> str:

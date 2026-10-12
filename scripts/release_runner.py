@@ -280,7 +280,10 @@ def _read_ready_line(process: subprocess.Popen[str]) -> str:
         selector.register(process.stdout, selectors.EVENT_READ)
         if not selector.select(timeout=5):
             return ""
-        return process.stdout.readline()
+        line = process.stdout.readline()
+    if not isinstance(line, str):
+        raise TypeError("recorder stdout must be text")
+    return line
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
