@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./app";
@@ -75,7 +75,7 @@ describe("App", () => {
     expect(screen.getByRole("alert")).not.toHaveTextContent("untrusted provider body");
     expect(screen.getByRole("navigation", { name: "Run trajectory" })).toBeInTheDocument();
     const alert = screen.getByRole("alert");
-    expect(alert).toHaveFocus();
+    await waitFor(() => expect(alert).toHaveFocus());
     await user.tab();
     expect(alert).not.toHaveFocus();
   });
