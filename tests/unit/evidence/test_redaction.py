@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from agentic_saga.contracts import redaction
 from agentic_saga.contracts.redaction import RedactionPolicy, redact_json
-from tests.support.credentials import stateless_installation_token
+from tests.support.github_tokens import stateless_installation_token
 
 
 def test_should_redact_nested_credentials_without_mutating_input() -> None:

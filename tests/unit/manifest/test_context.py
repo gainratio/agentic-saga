@@ -14,7 +14,7 @@ from agentic_saga import SagaManifest, load_saga_context
 from agentic_saga.contracts.runtime import ToolDescriptor
 from agentic_saga.contracts.tools import ReadToolDefinition, ToolRegistry
 from agentic_saga.manifest import ManifestInputError
-from tests.support.credentials import stateless_installation_token
+from tests.support.github_tokens import stateless_installation_token
 
 _FAKE_PROVIDER_TOKEN = "_".join(("sk", "live", "abcdefghijklmnopqrstuv"))
 
