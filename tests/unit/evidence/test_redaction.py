@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from agentic_saga.contracts import redaction
 from agentic_saga.contracts.redaction import RedactionPolicy, redact_json
+from tests.support.credentials import stateless_installation_token
 
 
 def test_should_redact_nested_credentials_without_mutating_input() -> None:
@@ -55,6 +56,18 @@ def test_should_redact_high_confidence_credentials_outside_sensitive_key(
     credential: str,
 ) -> None:
     assert redact_json({"note": credential}, RedactionPolicy()) == {"note": "[REDACTED]"}
+
+
+def test_should_redact_stateless_github_app_token_outside_sensitive_key() -> None:
+    # Given: a 2026-format ghs_<APPID>_<JWT> token under a non-secret key
+    token = stateless_installation_token()
+    assert len(token) >= 500 and all(character in token for character in ".-_")
+
+    # When
+    redacted = redact_json({"note": token}, RedactionPolicy())
+
+    # Then
+    assert redacted == {"note": "[REDACTED]"}
 
 
 def test_should_redact_card_number_outside_sensitive_key() -> None:
