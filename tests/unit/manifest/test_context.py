@@ -14,6 +14,7 @@ from agentic_saga import SagaManifest, load_saga_context
 from agentic_saga.contracts.runtime import ToolDescriptor
 from agentic_saga.contracts.tools import ReadToolDefinition, ToolRegistry
 from agentic_saga.manifest import ManifestInputError
+from tests.support.github_tokens import stateless_installation_token
 
 _FAKE_PROVIDER_TOKEN = "_".join(("sk", "live", "abcdefghijklmnopqrstuv"))
 
@@ -410,6 +411,25 @@ def test_should_reject_high_confidence_secret_patterns(tmp_path: Path, replaceme
     registry = _registry("search_options")
     text = _manifest_text(_digest(registry)).replace(
         "Book a valid itinerary or restore a clean state.", replacement
+    )
+    path = _write(tmp_path / "saga.yaml", text)
+
+    # When / Then
+    with pytest.raises(ValueError, match="private material"):
+        load_saga_context(
+            path,
+            registry=registry,
+            policy_checks=("traveler_authorized",),
+            invariant_checks=("ticket_issued", "no_active_hold", "no_charge"),
+        )
+
+
+def test_should_reject_stateless_github_app_token_inside_manifest_text(tmp_path: Path) -> None:
+    # Given: the token is embedded in prose, so only the secret pattern guard can catch it
+    registry = _registry("search_options")
+    text = _manifest_text(_digest(registry)).replace(
+        "Book a valid itinerary or restore a clean state.",
+        f"Book with {stateless_installation_token()} then stop.",
     )
     path = _write(tmp_path / "saga.yaml", text)
 

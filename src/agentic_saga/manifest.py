@@ -57,7 +57,8 @@ _SECRET_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
     ),
     re.compile(
         r"\b(?:sk_(?:live|test)_[A-Za-z0-9]{12,}|gh[pousr]_[A-Za-z0-9]{20,}|"
-        r"AKIA[0-9A-Z]{16})\b"
+        # Stateless GitHub App / Actions tokens: ghs_<APPID>_<JWT>, base64url with dots.
+        r"ghs_[A-Za-z0-9._-]{36,}|AKIA[0-9A-Z]{16})\b"
     ),
 )
 

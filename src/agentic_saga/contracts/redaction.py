@@ -15,8 +15,13 @@ _JSON_ADAPTER: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 _BEARER = re.compile(r"^\s*bearer\s+\S+", re.IGNORECASE)
 _CARD = re.compile(r"^(?:\d[ -]?){12,18}\d$")
 _HIGH_CONFIDENCE_CREDENTIAL = re.compile(
-    r"(?:sk-or-v1-[A-Za-z0-9_-]{32,}|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,})"
+    r"(?:sk-or-v1-[A-Za-z0-9_-]{32,}|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,}"
+    # Stateless GitHub App / Actions tokens: ghs_<APPID>_<JWT>, base64url with dots.
+    r"|ghs_[A-Za-z0-9._-]{36,})"
 )
+# The same credentials inside free text ("Authorization: token ghp_..."): only the match is
+# replaced, and the lookbehind keeps a credential-shaped tail of a longer word untouched.
+_EMBEDDED_CREDENTIAL = re.compile(rf"(?<![A-Za-z0-9]){_HIGH_CONFIDENCE_CREDENTIAL.pattern}")
 _KEY_PART = re.compile(r"[A-Za-z0-9]+")
 _CAMEL_TOKEN = re.compile(r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z]?[a-z]+|[0-9]+")
 _SECRET_REFERENCE = re.compile(r"^[a-z][a-z0-9+.-]*://[^\s]+/v[1-9][0-9]*$")
@@ -229,7 +234,9 @@ def _is_integer_card(value: JsonScalar) -> bool:
 
 
 def _redact_string(value: str, policy: RedactionPolicy) -> str:
-    return policy.placeholder if _is_sensitive_string(value) else value
+    if _is_sensitive_string(value):
+        return policy.placeholder
+    return _EMBEDDED_CREDENTIAL.sub(policy.placeholder, value)
 
 
 def _is_sensitive_string(value: str) -> bool:
