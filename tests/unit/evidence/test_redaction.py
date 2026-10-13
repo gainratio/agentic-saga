@@ -1,10 +1,11 @@
+from collections.abc import Callable
 from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
 
 from agentic_saga.contracts import redaction
-from agentic_saga.contracts.redaction import RedactionPolicy, redact_json
+from agentic_saga.contracts.redaction import RedactionPolicy, contains_sensitive_json, redact_json
 from tests.support.github_tokens import stateless_installation_token
 
 
@@ -68,6 +69,54 @@ def test_should_redact_stateless_github_app_token_outside_sensitive_key() -> Non
 
     # Then
     assert redacted == {"note": "[REDACTED]"}
+
+
+def _classic_token() -> str:
+    return "ghp" + "_" + "c" * 36
+
+
+@pytest.mark.parametrize(
+    ("template", "token"),
+    [
+        ("Authorization: token {}", _classic_token),
+        ("token {}", _classic_token),
+        ("Authorization: token {}", stateless_installation_token),
+        ("export GITHUB_TOKEN={} && gh api /user", stateless_installation_token),
+    ],
+    ids=["header-classic", "prefix-classic", "header-stateless", "shell-stateless"],
+)
+def test_should_redact_credentials_embedded_in_text_under_non_secret_key(
+    template: str, token: Callable[[], str]
+) -> None:
+    # Given: a credential inside free text, under a key that is not secret-shaped
+    secret = token()
+    value = {"note": template.format(secret)}
+
+    # When
+    redacted = redact_json(value, RedactionPolicy())
+
+    # Then: only the credential is replaced; the surrounding text survives
+    assert redacted == {"note": template.format("[REDACTED]")}
+    assert contains_sensitive_json(value, RedactionPolicy())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Authorization header uses a token from the vault",
+        "ghp_ prefix marks a personal access token",
+        "the ghs_short id is not a credential",
+        "AKIAlowercase is not an access key",
+        "see https://github.com/gainratio/agentic-saga/pull/48",
+    ],
+)
+def test_should_preserve_text_without_embedded_credentials(text: str) -> None:
+    # Given
+    value = {"note": text}
+
+    # When / Then
+    assert redact_json(value, RedactionPolicy()) == value
+    assert not contains_sensitive_json(value, RedactionPolicy())
 
 
 def test_should_redact_card_number_outside_sensitive_key() -> None:
