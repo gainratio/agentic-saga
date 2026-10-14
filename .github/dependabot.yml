@@ -7,6 +7,10 @@ version: 2
 updates:
   - package-ecosystem: uv
     directory: "/"
+    # The Dagger module's SDK is generated and gitignored, so its path dependency
+    # (`dagger-io` at .dagger/sdk) is not retrievable by the updater.
+    exclude-paths:
+      - ".dagger/**"
     schedule:
       interval: monthly
     cooldown:
