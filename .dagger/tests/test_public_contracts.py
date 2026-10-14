@@ -5,6 +5,7 @@ import asyncio
 import importlib.util
 import inspect
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -28,8 +29,12 @@ CONFIG = ROOT / "dagger.json"
 PYPROJECT = ROOT / ".dagger" / "pyproject.toml"
 WORKFLOWS = ROOT / ".github" / "workflows"
 FOUNDATION_SHA = "8420264d5560b0817579d9c5323ae3a69ce4558d"
-CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
-DAGGER_ACTION_SHA = "27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77"
+#: Actions the ingress workflows may use. Owners stay allow-listed; SHAs are a property, not a copy.
+CHECKOUT_ACTION = "actions/checkout"
+DAGGER_ACTION = "dagger/dagger-for-github"
+#: Every `uses:` is an immutable 40-hex commit with a `# vX` tag comment. Dependabot moves the SHA;
+#: this test must never hold a copy of it (inverted contract: was exact SHA literals).
+PINNED_USES = re.compile(r"^\s*(?:- )?uses: ([\w.-]+/[\w.-]+)@([0-9a-f]{40}) # v\d[\w.-]*$")
 PYTHON_IMAGES = (
     "python:3.12.12-bookworm@sha256:"
     "c0abd0758831ad99b7a29e0c1a875da9c4abb9a2e3f21e2eeb585dbcadfb6cd0",
@@ -71,21 +76,6 @@ VALID_MANIFEST = "\n".join(
 PUBLIC_INPUTS = (
     ("commit_sha", "str"),
     ("repository", "str"),
-    ("git_auth_header", "dagger.Secret | None"),
-)
-AUTH_ARGUMENT = "--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER"
-AUTH_PREDICATE = (
-    "github.event.repository.private && (github.event_name != 'pull_request' || "
-    "github.event.pull_request.head.repo.full_name == github.repository) && "
-    "secrets.DAGGER_GIT_HTTP_AUTH_HEADER != ''"
-)
-# Inverted contract (was: args carried `${{ <predicate> && '<auth flag>' || '' }}`, pasting an
-# event expression into dagger-for-github's bash). The predicate now renders into the
-# USE_GIT_AUTH env var and args only test it, so no expression reaches the script.
-SAFE_AUTH_SWITCH_EXPRESSION = f"${{{{ {AUTH_PREDICATE} && 'true' || '' }}}}"
-SAFE_AUTH_ARGUMENT = f"${{USE_GIT_AUTH:+{AUTH_ARGUMENT}}}"
-SAFE_AUTH_ENV_EXPRESSION = (
-    f"${{{{ {AUTH_PREDICATE} && secrets.DAGGER_GIT_HTTP_AUTH_HEADER || '' }}}}"
 )
 GENERATED_PATHS = (".dagger/sdk/generated.py", ".dagger/.venv/pyvenv.cfg")
 GENERATED_PREFIXES = (".dagger/sdk/", ".dagger/.venv/")
@@ -226,8 +216,8 @@ def _assert_frontend_runtime_contract(source: str) -> None:
 def _assert_public_schema(source: str) -> None:
     actual = tuple(_signature(method) for method in _public_methods(_adapter_class(_tree(source))))
     expected = (
-        ("ci", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
-        ("security", (), PUBLIC_INPUTS, None, (), None, (1, 0), "str"),
+        ("ci", (), PUBLIC_INPUTS, None, (), None, (0, 0), "str"),
+        ("security", (), PUBLIC_INPUTS, None, (), None, (0, 0), "str"),
     )
     assert actual == expected, "only ci and security may be public Dagger functions"
 
@@ -290,15 +280,11 @@ def _assert_workflow_boundary(name: str, workflow: str) -> None:
     job = cast(dict[str, object], jobs["dagger"])
     steps = cast(list[dict[str, object]], job["steps"])
     argument = "ci" if name == "dagger.yml" else "security"
-    checkout = [step for step in steps if step.get("uses") == f"actions/checkout@{CHECKOUT_SHA}"]
-    dagger_steps = [
-        step
-        for step in steps
-        if step.get("uses") == f"dagger/dagger-for-github@{DAGGER_ACTION_SHA}"
-    ]
+    _assert_pinned_uses(workflow)
+    checkout = [step for step in steps if _action(step) == CHECKOUT_ACTION]
+    dagger_steps = [step for step in steps if _action(step) == DAGGER_ACTION]
     expected_args = (
-        f"{argument} --commit-sha=${{{{ github.sha }}}} "
-        f"--repository=${{{{ github.repository }}}} {SAFE_AUTH_ARGUMENT}"
+        f"{argument} --commit-sha=${{{{ github.sha }}}} --repository=${{{{ github.repository }}}}"
     )
     arguments = [
         cast(dict[str, str], step["with"])["args"]
@@ -307,12 +293,26 @@ def _assert_workflow_boundary(name: str, workflow: str) -> None:
     ]
     assert len(checkout) == 1
     assert len(dagger_steps) == 1
-    assert dagger_steps[0]["env"] == {
-        "DAGGER_GIT_HTTP_AUTH_HEADER": SAFE_AUTH_ENV_EXPRESSION,
-        "USE_GIT_AUTH": SAFE_AUTH_SWITCH_EXPRESSION,
-    }
+    # Inverted contract (was: a private-repo git auth header from secrets). The repository and its
+    # shared modules are public, so no run, and above all no pull_request run, needs a secret.
+    assert "env" not in dagger_steps[0]
+    assert "secrets." not in workflow, "Dagger ingress must not read a secret"
     assert arguments == [expected_args], "workflow must contain one sole Dagger invocation"
     assert dagger_steps[0]["with"] == {"version": "0.21.8", "verb": "call", "args": expected_args}
+
+
+def _action(step: dict[str, object]) -> str:
+    return str(step.get("uses", "")).partition("@")[0]
+
+
+def _assert_pinned_uses(workflow: str) -> None:
+    uses = [
+        line for line in workflow.splitlines() if line.lstrip().startswith(("uses:", "- uses:"))
+    ]
+    pinned = [PINNED_USES.match(line) for line in uses]
+    assert uses and all(pinned), "every action must be pinned to a 40-hex SHA with a # vX comment"
+    owners = {match.group(1) for match in pinned if match}
+    assert owners <= {CHECKOUT_ACTION, DAGGER_ACTION}, f"unapproved action owner: {owners}"
 
 
 def _git_binary() -> str:
@@ -432,8 +432,8 @@ def test_should_own_source_through_the_engine_workspace() -> None:
 def test_should_reject_a_reintroduced_caller_supplied_source() -> None:
     # Given a copied adapter whose CI entry point accepts a caller directory again.
     source = MODULE.read_text().replace(
-        "async def ci(\n        self,\n",
-        "async def ci(\n        self,\n        source: dagger.Directory,\n",
+        "async def ci(self, ",
+        "async def ci(self, source: dagger.Directory, ",
         1,
     )
     assert source != MODULE.read_text(), "mutation must apply"
@@ -481,11 +481,11 @@ def test_should_reject_hidden_or_defaulted_public_inputs() -> None:
 class AgenticSaga:
     @function
     async def ci(self, source: dagger.Directory, /, *extra: str, commit_sha: str = '',
-                 git_auth_header: dagger.Secret = None, **kwargs: str) -> str:
+                 token: dagger.Secret = None, **kwargs: str) -> str:
         return ''
     @function
     async def security(self, source: dagger.Directory, commit_sha: str,
-                       *, git_auth_header: dagger.Secret) -> str:
+                       *, token: dagger.Secret) -> str:
         return ''
 """
 
@@ -712,57 +712,72 @@ def test_should_preserve_thin_pinned_workflow_ingress(name: str) -> None:
     _assert_workflow_boundary(name, workflow)
 
 
+@pytest.mark.parametrize("action", (CHECKOUT_ACTION, DAGGER_ACTION))
 @pytest.mark.parametrize(
-    ("private", "event_name", "head_repository", "secret_available", "expected"),
+    ("ref", "comment"),
     (
-        (True, "push", None, True, True),
-        (True, "pull_request", "SELF", True, True),
-        (True, "pull_request", "contributor/agentic-saga", True, False),
-        (True, "schedule", None, True, True),
-        (True, "workflow_dispatch", None, True, True),
-        (True, "push", None, False, False),
-        (True, "pull_request", "SELF", False, False),
-        (False, "push", None, True, False),
-        (False, "pull_request", "SELF", True, False),
-        (False, "pull_request", "contributor/agentic-saga", True, False),
-        (False, "schedule", None, True, False),
-        (False, "workflow_dispatch", None, True, False),
+        ("v4", " # v4"),
+        ("a" * 39, " # v4"),
+        ("A" * 40, " # v4"),
+        ("a" * 40, ""),
+        ("a" * 40, " # main"),
     ),
 )
-def test_should_select_auth_only_for_private_trusted_events(
-    private: bool,
-    event_name: str,
-    head_repository: str | None,
-    secret_available: bool,
-    expected: bool,
-) -> None:
-    # Given the repository visibility and event identity used by the exact workflow expression.
-    # The run's own repository (gainratio, or hseshadr mid-move) is "SELF".
-    for run_repository in main.ALLOWED_REPOSITORIES:
-        head = run_repository if head_repository == "SELF" else head_repository
-        trusted = event_name != "pull_request" or head == run_repository
-
-        # When the authentication selection contract is evaluated.
-        selected = private and trusted and secret_available
-        secret = "masked-secret" if secret_available else ""
-        environment = secret if selected else ""
-
-        # Then public, external-fork, and no-secret events receive neither auth surface.
-        assert selected is expected
-        assert environment == (secret if expected else "")
-
-
-@pytest.mark.parametrize(
-    ("original", "replacement"),
-    ((CHECKOUT_SHA, "v4"), (DAGGER_ACTION_SHA, "v8.4.1")),
-)
-def test_should_reject_an_unpinned_workflow_action(original: str, replacement: str) -> None:
-    # Given a copied workflow with a floating action reference.
-    workflow = (WORKFLOWS / "dagger.yml").read_text().replace(original, replacement, 1)
+def test_should_reject_an_unpinned_workflow_action(action: str, ref: str, comment: str) -> None:
+    # Given a copied workflow whose action moved off an immutable, tag-commented SHA.
+    pattern = re.compile(rf"{re.escape(action)}@[0-9a-f]{{40}} # v[\w.-]+")
+    workflow, applied = pattern.subn(
+        f"{action}@{ref}{comment}", (WORKFLOWS / "dagger.yml").read_text(), 1
+    )
+    assert applied == 1, "mutation must apply"
 
     # When the ingress contract is checked.
-    # Then neither checkout nor Dagger itself can float.
-    with pytest.raises(AssertionError):
+    # Then neither checkout nor Dagger itself can float or lose its tag comment.
+    with pytest.raises(AssertionError, match="pinned to a 40-hex SHA"):
+        _assert_workflow_boundary("dagger.yml", workflow)
+
+
+def test_should_accept_any_dependabot_bump_of_a_pinned_action() -> None:
+    # Given a copied workflow where Dependabot moved both actions to new SHAs and tags.
+    workflow, applied = re.subn(
+        r"@[0-9a-f]{40} # v[\w.-]+",
+        "@" + "b" * 40 + " # v99.0.0",
+        (WORKFLOWS / "dagger.yml").read_text(),
+    )
+    assert applied == len((CHECKOUT_ACTION, DAGGER_ACTION)), "both actions must be bumped"
+
+    # When the ingress contract is checked.
+    # Then a bump that keeps the immutable-pin property passes with no test edit.
+    _assert_workflow_boundary("dagger.yml", workflow)
+
+
+def test_should_reject_an_unapproved_action_owner() -> None:
+    # Given a copied workflow that swaps checkout for another owner's action at a pinned SHA.
+    workflow = (
+        (WORKFLOWS / "dagger.yml")
+        .read_text()
+        .replace(f"{CHECKOUT_ACTION}@", "someone/checkout@", 1)
+    )
+    assert "someone/checkout@" in workflow, "mutation must apply"
+
+    # When the ingress contract is checked.
+    # Then the owner allowlist still holds.
+    with pytest.raises(AssertionError, match="unapproved action owner"):
+        _assert_workflow_boundary("dagger.yml", workflow)
+
+
+def test_should_reject_a_secret_in_the_dagger_ingress() -> None:
+    # Given a copied PR-triggered workflow that hands the Dagger step a secret again.
+    original = (WORKFLOWS / "dagger.yml").read_text()
+    injected_env = "        env:\n          TOKEN: ${{ secrets.TOKEN }}\n"
+    workflow = original.replace(
+        "        with:\n          version:", f"{injected_env}        with:\n          version:", 1
+    )
+    assert workflow != original, "mutation must apply"
+
+    # When the ingress contract is checked.
+    # Then a secret can never come back into the ingress.
+    with pytest.raises(AssertionError, match="env"):
         _assert_workflow_boundary("dagger.yml", workflow)
 
 
@@ -873,7 +888,7 @@ def _assert_shared_build_contract(module: ModuleType, monkeypatch: pytest.Monkey
 def test_should_reject_missing_exact_source_resolution() -> None:
     # Given a copied adapter that bypasses canonical source resolution.
     source = MODULE.read_text().replace(
-        "verified = await _release_source(self.source, commit_sha, git_auth_header, repository)",
+        "verified = await _release_source(self.source, commit_sha, repository)",
         "verified = self.source",
     )
 
@@ -936,17 +951,16 @@ def test_should_fail_closed_for_an_invalid_shared_artifact_manifest(manifest: st
         main._validated_manifest(manifest)
 
 
-@pytest.mark.parametrize("auth_header", (None, f"Basic {uuid.uuid4().hex}"))
 def test_should_orchestrate_ci_with_plain_async_collaborators(
-    monkeypatch: pytest.MonkeyPatch, auth_header: str | None
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Given concrete source and output identities supplied by async collaborators.
     source, verified, artifacts, frontend = object(), object(), object(), object()
     events: list[str] = []
 
-    async def resolve(received: object, commit_sha: str, auth: object, repository: str) -> object:
+    async def resolve(received: object, commit_sha: str, repository: str) -> object:
         assert repository == GAINRATIO_REPOSITORY
-        assert (received, commit_sha, auth) == (source, "a" * 40, auth_header)
+        assert (received, commit_sha) == (source, "a" * 40)
         events.append("resolve")
         return verified
 
@@ -970,11 +984,10 @@ def test_should_orchestrate_ci_with_plain_async_collaborators(
     monkeypatch.setattr(main, "_artifact_manifest", manifest, raising=False)
 
     # When public CI is awaited.
-    result = asyncio.run(_saga(source).ci("a" * 40, GAINRATIO_REPOSITORY, auth_header))
+    result = asyncio.run(_saga(source).ci("a" * 40, GAINRATIO_REPOSITORY))
 
     # Then the resolved source flows into both later orchestration phases.
     assert result == f"Agentic Saga canonical Dagger gate passed\nSHA256SUMS\n{VALID_MANIFEST}"
-    assert auth_header is None or auth_header not in result
     assert events == ["resolve", "shared", "matrix", "manifest"]
 
 
@@ -994,7 +1007,7 @@ def test_should_propagate_security_audit_failure_before_frontend_work(
     # When the public security entry point is awaited.
     # Then its dependency-audit failure remains visible without starting a Dagger container.
     with pytest.raises(RuntimeError, match="locked audit failed"):
-        asyncio.run(_saga(dag.directory()).security("a" * 40, GAINRATIO_REPOSITORY, object()))
+        asyncio.run(_saga(dag.directory()).security("a" * 40, GAINRATIO_REPOSITORY))
 
 
 def test_should_create_shared_outputs_from_real_lazy_dagger_containers(
@@ -1103,14 +1116,17 @@ class _RecordingDag:
         return self
 
     def guard(self, **kwargs: object) -> _RecordingDag:
+        assert "http_auth_header" not in kwargs, "public history needs no git auth"
         self.calls.append(("guard", str(kwargs["repository"])))
         return self
 
     def dependency_audit(self, **kwargs: object) -> _RecordingDag:
+        assert "http_auth_header" not in kwargs, "public history needs no git auth"
         self.calls.append(("dependency_audit", str(kwargs["repository"])))
         return self
 
-    def git(self, url: str, **_: object) -> _RecordingDag:
+    def git(self, url: str, **kwargs: object) -> _RecordingDag:
+        assert "http_auth_header" not in kwargs, "public history needs no git auth"
         self.calls.append(("git", url))
         return self
 
@@ -1168,8 +1184,8 @@ def test_should_guard_and_fetch_the_run_repository(
     source = cast(Directory, object())
 
     # When exact source is resolved and the dependency audit runs for that identity.
-    tree = asyncio.run(main._release_source(source, "a" * 40, None, repository))
-    asyncio.run(main._dependency_audit(source, "a" * 40, None, repository))
+    tree = asyncio.run(main._release_source(source, "a" * 40, repository))
+    asyncio.run(main._dependency_audit(source, "a" * 40, repository))
 
     # Then the guard, the exact-source fetch, and the audit all use the run identity.
     assert tree == "verified-tree"
@@ -1192,9 +1208,9 @@ def test_should_refuse_before_any_dagger_call(
     # When exact source resolution or the audit is attempted.
     # Then each refuses before the guard, fetch, or audit is ever called.
     with pytest.raises(ValueError, match="not an allowed agentic-saga repository"):
-        asyncio.run(main._release_source(source, "a" * 40, None, repository))
+        asyncio.run(main._release_source(source, "a" * 40, repository))
     with pytest.raises(ValueError, match="not an allowed agentic-saga repository"):
-        asyncio.run(main._dependency_audit(source, "a" * 40, None, repository))
+        asyncio.run(main._dependency_audit(source, "a" * 40, repository))
     assert recorder.calls == []
 
 
@@ -1205,7 +1221,7 @@ def test_should_pass_the_run_repository_from_each_public_function(
     # Given public functions whose source resolution records its identity and stops.
     seen: list[str] = []
 
-    async def stop(_s: object, _c: str, _a: object, repository: str) -> None:
+    async def stop(_s: object, _c: str, repository: str) -> None:
         seen.append(repository)
         raise RuntimeError("stop")
 

@@ -1,14 +1,14 @@
 version: 2
-# Every ecosystem is grouped (`patterns: ["*"]`) so each weekly run opens ONE PR
-# per ecosystem instead of one PR per dependency. Python uses the `uv`
-# ecosystem, not `pip`: `pip` bumped pyproject pins without relocking uv.lock,
-# so its PRs were never installed or tested under the locked environment.
+# One grouped PR per ecosystem per month (`patterns: ["*"]`), minor and patch only.
+# Semver-major updates are ignored on purpose: majors are migrated by hand, in a
+# human-written PR, because they are where real breakage lives.
+# Python uses the `uv` ecosystem, not `pip`: `pip` bumped pyproject pins without
+# relocking uv.lock, so its PRs were never installed or tested under the lock.
 updates:
   - package-ecosystem: uv
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
@@ -16,14 +16,16 @@ updates:
       python:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - dependencies
       - python
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
@@ -31,6 +33,9 @@ updates:
       actions:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - dependencies
       - github-actions
