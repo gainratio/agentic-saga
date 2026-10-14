@@ -150,44 +150,23 @@ def allowed_repository(repository: str) -> str:
     return repository
 
 
-async def _guard(
-    source: dagger.Directory,
-    commit_sha: str,
-    git_auth_header: dagger.Secret | None,
-    repository: str,
-) -> None:
-    guard = dag.foundation().guard(
-        source=source,
-        repository=repository,
-        commit_sha=commit_sha,
-        http_auth_header=git_auth_header,
-    )
+async def _guard(source: dagger.Directory, commit_sha: str, repository: str) -> None:
+    guard = dag.foundation().guard(source=source, repository=repository, commit_sha=commit_sha)
     await guard.sync()
 
 
 async def _release_source(
-    source: dagger.Directory,
-    commit_sha: str,
-    git_auth_header: dagger.Secret | None,
-    repository: str,
+    source: dagger.Directory, commit_sha: str, repository: str
 ) -> dagger.Directory:
     identity = allowed_repository(repository)
-    await _guard(source, commit_sha, git_auth_header, identity)
-    remote = dag.git(f"https://github.com/{identity}.git", http_auth_header=git_auth_header)
+    await _guard(source, commit_sha, identity)
+    remote = dag.git(f"https://github.com/{identity}.git")
     return remote.commit(commit_sha).tree(depth=0, include_tags=True)
 
 
-async def _dependency_audit(
-    source: dagger.Directory,
-    commit_sha: str,
-    git_auth_header: dagger.Secret | None,
-    repository: str,
-) -> None:
+async def _dependency_audit(source: dagger.Directory, commit_sha: str, repository: str) -> None:
     audit = dag.python_package().dependency_audit(
-        source=source,
-        repository=allowed_repository(repository),
-        commit_sha=commit_sha,
-        http_auth_header=git_auth_header,
+        source=source, repository=allowed_repository(repository), commit_sha=commit_sha
     )
     await audit.sync()
 
@@ -401,28 +380,18 @@ class AgenticSaga:
 
     @function
     @check
-    async def ci(
-        self,
-        commit_sha: str,
-        repository: str,
-        git_auth_header: dagger.Secret | None = None,
-    ) -> str:
+    async def ci(self, commit_sha: str, repository: str) -> str:
         """Run guarded Temporal, frontend, and measured release gates."""
-        verified = await _release_source(self.source, commit_sha, git_auth_header, repository)
+        verified = await _release_source(self.source, commit_sha, repository)
         artifacts, frontend = await _shared_outputs(verified)
         await _runtime_matrix(verified, artifacts, frontend)
         manifest = await _artifact_manifest(artifacts)
         return f"Agentic Saga canonical Dagger gate passed\nSHA256SUMS\n{manifest}"
 
     @function
-    async def security(
-        self,
-        commit_sha: str,
-        repository: str,
-        git_auth_header: dagger.Secret | None = None,
-    ) -> str:
+    async def security(self, commit_sha: str, repository: str) -> str:
         """Run guarded locked Python and frontend dependency audits."""
-        verified = await _release_source(self.source, commit_sha, git_auth_header, repository)
-        await _dependency_audit(verified, commit_sha, git_auth_header, repository)
+        verified = await _release_source(self.source, commit_sha, repository)
+        await _dependency_audit(verified, commit_sha, repository)
         await _node(verified).with_exec(["pnpm", "audit"]).sync()
         return "Agentic Saga dependency audits passed"

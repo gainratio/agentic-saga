@@ -22,20 +22,8 @@ DAGGER_ACTION = "dagger/dagger-for-github@"
 ATTACKER_EXPRESSIONS = ("${{ inputs.", "${{ github.event.", "${{ github.head_ref")
 #: The action passes `module` as INPUT_MODULE; every other input is pasted into bash.
 ENV_ONLY_INPUTS = frozenset({"module"})
-AUTH_ARGUMENT = "--git-auth-header=env:DAGGER_GIT_HTTP_AUTH_HEADER"
 COMMIT_SHA = "a" * 40
 RUN_REPOSITORY = "gainratio/agentic-saga"
-#: USE_GIT_AUTH values a hostile or broken environment could carry.
-HOSTILE_SWITCHES = (
-    "true",
-    "false",
-    "$(touch pwned)",
-    "`touch pwned`",
-    "x;touch pwned",
-    "x --source=/",
-    'x" ; touch pwned ; "',
-    "x\ntouch pwned",
-)
 
 Step = dict[str, object]
 
@@ -63,7 +51,7 @@ def _script_inputs() -> list[tuple[str, str, str]]:
     ]
 
 
-def _expand_like_the_action(args: str, switch: str, cwd: Path) -> list[str]:
+def _expand_like_the_action(args: str, cwd: Path) -> list[str]:
     """Render `${{ github.sha }}`/`${{ github.repository }}` as Actions does, then expand."""
     bash = shutil.which("bash")
     assert bash is not None
@@ -72,7 +60,7 @@ def _expand_like_the_action(args: str, switch: str, cwd: Path) -> list[str]:
     )
     result = subprocess.run(  # noqa: S603 - fixed bash, test-owned argv
         [bash, "-c", f"printf '%s\\0' {rendered}"],
-        env={"USE_GIT_AUTH": switch, "PATH": "/usr/bin:/bin"},
+        env={"PATH": "/usr/bin:/bin"},
         cwd=cwd,
         capture_output=True,
         check=True,
@@ -99,37 +87,14 @@ def test_should_paste_no_attacker_controlled_expression_into_any_dagger_input() 
 @pytest.mark.parametrize(
     ("name", "verb"), (("dagger.yml", "ci"), ("dagger-security.yml", "security"))
 )
-def test_should_omit_git_auth_when_the_switch_is_empty(
+def test_should_pass_dagger_only_the_fixed_public_arguments(
     name: str, verb: str, tmp_path: Path
 ) -> None:
-    # Given the real args of a public or untrusted event, where USE_GIT_AUTH renders empty.
+    # Given the real args of the ingress workflow.
     args = str(cast(Step, _dagger_step(name)["with"])["args"])
 
     # When bash expands them.
-    argv = _expand_like_the_action(args, "", tmp_path)
+    argv = _expand_like_the_action(args, tmp_path)
 
-    # Then Dagger receives no auth argument at all.
+    # Then Dagger receives the verb, commit, and repository, and no auth argument at all.
     assert argv == [verb, f"--commit-sha={COMMIT_SHA}", f"--repository={RUN_REPOSITORY}"]
-
-
-@pytest.mark.parametrize("switch", HOSTILE_SWITCHES)
-@pytest.mark.parametrize(
-    ("name", "verb"), (("dagger.yml", "ci"), ("dagger-security.yml", "security"))
-)
-def test_should_turn_any_non_empty_switch_into_only_the_fixed_auth_argument(
-    name: str, verb: str, switch: str, tmp_path: Path
-) -> None:
-    # Given the real args and any non-empty USE_GIT_AUTH value.
-    args = str(cast(Step, _dagger_step(name)["with"])["args"])
-
-    # When bash expands them.
-    argv = _expand_like_the_action(args, switch, tmp_path)
-
-    # Then the value is only a presence test: Dagger gets the fixed literal and bash ran nothing.
-    assert argv == [
-        verb,
-        f"--commit-sha={COMMIT_SHA}",
-        f"--repository={RUN_REPOSITORY}",
-        AUTH_ARGUMENT,
-    ]
-    assert not (tmp_path / "pwned").exists()
