@@ -22,7 +22,7 @@ the undo cannot be proven, it stops and waits for a person.
 
 ## Try it
 
-You need [uv](https://docs.astral.sh/uv/) and an internet connection for the first run. uv
+You need [uv](https://docs.astral.sh/uv/), git, and an internet connection for the first run. uv
 installs a matching Python and the dependencies if you don't have them. Nothing else to install, and no
 account or API key.
 
@@ -32,8 +32,9 @@ cd agentic-saga
 uv run poe demo
 ```
 
-The command starts a throwaway Temporal server on your machine (the first run downloads it, about
-a minute), runs one checkout on it, and opens the page above. The page explains itself in plain
+The command starts a throwaway Temporal server on your machine (the first run downloads Python,
+the dependencies, and Temporal: under a minute on a fast connection), runs one checkout on it, and
+opens the page above. If no browser can open, it prints the page's address instead. The page explains itself in plain
 words, so you can show it to someone who doesn't write code. Each step takes about a second and a
 half so you can follow it:
 
@@ -46,7 +47,8 @@ half so you can follow it:
 The agent in this demo is a fixed script and the shop is simulated, so no money moves and no AI
 model is called. The page says so. Developers can open **Technical details for developers** for
 the full record of every step. Your terminal shows the same run (a real run, shortened; port
-numbers change each time):
+numbers change each time; Temporal also prints a few lines of its own, including a harmless
+`WARN ... Cluster Id` line):
 
 ```text
 Agentic Saga live demo: business-failure (delivery fails after payment, so earlier steps are undone).

@@ -106,7 +106,9 @@
   border-bottom: 1px solid var(--steel);
   text-align: left;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: anywhere lets the table shrink a column below its longest word, so
+     "Step" and "Inspect" split mid-word. break-word only breaks a token that cannot fit at all. */
+  overflow-wrap: break-word;
 }
 
 .story th {
@@ -209,7 +211,7 @@
   padding: 8px;
   border-bottom: 1px solid var(--steel);
   text-align: left;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .ledger th {
