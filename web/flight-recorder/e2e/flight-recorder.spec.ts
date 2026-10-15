@@ -456,3 +456,68 @@ test("all use cases show verified checkmarks and the story labels each event res
   await page.getByRole("button", { name: "Show outcome", exact: true }).click();
   await expect(story.getByRole("row").filter({ hasText: "Refund completed" })).toBeVisible();
 });
+
+interface TraceIndexRuns {
+  readonly runs: readonly { readonly id: string }[];
+}
+
+/** The page as `uv run poe demo` serves it: one live run, developer view unfolded. */
+async function openLiveRecorder(page: Page): Promise<NetworkEvidence> {
+  const evidence = await installTraceRoutes(page);
+  await page.route("**/traces/index.json", async (route) => {
+    const response = await route.fetch();
+    const index: TraceIndexRuns = await response.json();
+    const runs = index.runs.filter((run) => run.id === "business-failure");
+    await route.fulfill({ json: { ...index, live: true, runs }, response });
+  });
+  await page.goto("/");
+  await page.getByText("Technical details for developers").click();
+  return evidence;
+}
+
+async function wordsSplitAcrossLines(page: Page, tableName: string): Promise<string[]> {
+  const table = page.getByRole("table", { name: tableName });
+  await expect(table).toBeVisible();
+  return table.evaluate((element) => {
+    const split: string[] = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      for (const word of (node.textContent ?? "").matchAll(/[^\s-]+/g)) {
+        const range = document.createRange();
+        range.setStart(node, word.index);
+        range.setEnd(node, word.index + word[0].length);
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        if (lines.size > 1) split.push(word[0]);
+      }
+    }
+    return split;
+  });
+}
+
+async function linesPerRecordedTime(page: Page): Promise<number[]> {
+  const cells = page
+    .getByRole("table", { name: "Recorded ledger" })
+    .locator('td[data-label="Recorded"]');
+  return cells.evaluateAll((elements) =>
+    elements.map((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    }),
+  );
+}
+
+test("live developer tables keep words whole at a 1280-pixel laptop width", async ({ page }) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  const evidence = await openLiveRecorder(page);
+  const story = page.getByRole("table", { name: "Causal story" });
+  await expect(story.getByRole("row").filter({ hasText: "Refund completed" })).toBeVisible();
+  expect(await wordsSplitAcrossLines(page, "Causal story")).toEqual([]);
+  await page.getByRole("tab", { name: "Ledger" }).click();
+  expect(await wordsSplitAcrossLines(page, "Recorded ledger")).toEqual([]);
+  const recordedTimes = await linesPerRecordedTime(page);
+  expect(recordedTimes.length).toBeGreaterThan(0);
+  expect(recordedTimes.filter((lines) => lines !== 1)).toEqual([]);
+  expect(evidence.consoleErrors).toEqual([]);
+  expect(evidence.pageErrors).toEqual([]);
+});

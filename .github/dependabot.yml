@@ -23,6 +23,11 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # openrouter (every release through 1.3.57) requires pydantic<2.13, so a pydantic
+      # 2.13+ bump can never resolve and failed the whole uv job on 2026-10-14. Remove
+      # this once openrouter allows pydantic 2.13.
+      - dependency-name: "pydantic"
+        versions: [">=2.13"]
     labels:
       - dependencies
       - python
