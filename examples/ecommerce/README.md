@@ -20,6 +20,14 @@ proof, stable operation identities, retries, reconciliation, and compensation or
 
 ## Run it
 
+To watch one run live in your browser, with Temporal started for you:
+
+```bash
+uv run poe demo                 # business-failure; or pass happy-path, lost-response, ...
+```
+
+To run against a Temporal server you start yourself:
+
 Start Temporal's lightweight local development server in one terminal:
 
 ```bash

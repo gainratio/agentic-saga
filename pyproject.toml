@@ -96,6 +96,8 @@ include = [
   "/docs/NORTHSTAR-REVIEW.md",
   "/docs/adr",
   "/docs/agent-adapter.md",
+  "/docs/assets",
+  "/docs/integration.md",
   "/docs/architecture",
   "/docs/context-manifest.md",
   "/docs/flight-recorder.md",

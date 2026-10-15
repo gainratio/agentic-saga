@@ -4,7 +4,26 @@ TL;DR: the console command turns redacted `RunTrace` 1.0 recordings into a read-
 board on `127.0.0.1`. It never calls a model, executes a tool, resumes a Saga, or changes Saga
 state.
 
-## Run it
+## Watch a live run
+
+```bash
+uv run poe demo
+```
+
+This is the one-command demo from the README. `examples/ecommerce/live.py` starts a throwaway local
+Temporal server (`WorkflowEnvironment.start_local()`, downloaded on first use), runs one checkout
+saga with a scripted agent and simulated providers, and serves the recorder while the workflow is
+still running. Each time the workflow records new events, the script writes a fresh trace under a
+new file name and then points `traces/index.json` at it, with `"live": true` in the index. When the
+browser sees `live`, it checks every second instead of every three, titles the page
+"Agentic Saga · live run", and shows **Running** or **Undoing earlier steps** until the outcome is
+recorded. The banner states that the agent is scripted and no model is called.
+
+Pass a scenario name to watch another case, `--step-delay SECONDS` to change the simulated
+provider latency (default 1.5), `--temporal-address HOST:PORT` to use a server you already run,
+and `--no-open` to print the URL without opening a browser.
+
+## Replay the packaged recordings
 
 ```bash
 uv run --no-dev agentic-saga demo --scenario business-failure --open

@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 PUBLIC_RELEASE_DOCS = (
     "README.md",
-    "QUICKSTART.md",
+    "docs/integration.md",
     "CHANGELOG.md",
     "PROVENANCE.md",
     "SECURITY.md",
@@ -38,26 +38,26 @@ def test_public_release_docs_exist_and_hide_internal_work_status() -> None:
 
 
 def test_reader_paths_describe_only_the_temporal_runtime() -> None:
-    for path in ("README.md", "QUICKSTART.md"):
+    for path in ("README.md", "docs/integration.md"):
         text = _read(path)
         assert "Temporal" in text, path
         assert not any(value in text for value in _RETIRED), path
 
 
-def test_quickstart_runs_the_canonical_temporal_bdd_in_one_command() -> None:
-    quickstart = _read("QUICKSTART.md")
+def test_integration_guide_runs_the_canonical_temporal_bdd_in_one_command() -> None:
+    guide = _read("docs/integration.md")
 
     assert (
         "uv run pytest -q -m temporal --force-enable-socket tests/bdd/steps/test_ecommerce_saga.py"
-    ) in quickstart
-    assert "WorkflowEnvironment.start_time_skipping()" in quickstart
-    assert "temporal server start-dev" in quickstart
-    assert "Temporal Cloud" in quickstart
-    assert "production-ready self-hosted Temporal Service" in quickstart
+    ) in guide
+    assert "WorkflowEnvironment.start_time_skipping()" in guide
+    assert "temporal server start-dev" in guide
+    assert "Temporal Cloud" in guide
+    assert "production-ready self-hosted Temporal Service" in guide
 
 
-def test_quickstart_explains_agent_compensation_and_human_boundary() -> None:
-    quickstart = _read("QUICKSTART.md")
+def test_integration_guide_explains_agent_compensation_and_human_boundary() -> None:
+    guide = _read("docs/integration.md")
 
     required = (
         "agent is the planner, not the transaction engine",
@@ -65,7 +65,7 @@ def test_quickstart_explains_agent_compensation_and_human_boundary() -> None:
         "reconciles the same operation",
         "stale and unauthorized Updates are rejected",
     )
-    assert all(value in quickstart for value in required)
+    assert all(value in guide for value in required)
 
 
 def test_temporal_safety_contract_names_public_integration_legos() -> None:
@@ -115,7 +115,7 @@ def test_security_requires_encryption_kms_and_namespace_access_for_private_data(
 
 
 def test_openrouter_setup_uses_only_the_secret_free_template() -> None:
-    for path in ("QUICKSTART.md", "SECURITY.md", "docs/operations.md"):
+    for path in ("docs/integration.md", "SECURITY.md", "docs/operations.md"):
         text = _read(path)
         assert "cp .env.example .env" in text, path
         assert "OPENROUTER_API_KEY to your own key" in text, path
@@ -133,7 +133,7 @@ def test_release_docs_separate_deterministic_proof_from_live_model_quality() -> 
 
 def test_owned_document_links_resolve() -> None:
     paths = (
-        "QUICKSTART.md",
+        "docs/integration.md",
         "SECURITY.md",
         "PROVENANCE.md",
         "docs/operations.md",
