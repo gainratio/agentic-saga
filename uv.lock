@@ -51,7 +51,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openrouter", marker = "extra == 'jev-openrouter'", specifier = "==1.3.32" },
+    { name = "openrouter", marker = "extra == 'jev-openrouter'", specifier = "==1.3.35" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pydantic-ai-slim", extras = ["openrouter"], marker = "extra == 'agent'", specifier = "==2.54.0" },
     { name = "python-dotenv", marker = "extra == 'agent'", specifier = ">=1.1,<2" },
@@ -67,7 +67,7 @@ dev = [
     { name = "hypothesis", specifier = ">=6.130,<7" },
     { name = "mutmut", specifier = ">=3.6,<4" },
     { name = "mypy", specifier = ">=1.17,<3" },
-    { name = "openrouter", specifier = "==1.3.32" },
+    { name = "openrouter", specifier = "==1.3.35" },
     { name = "pip", specifier = ">=25,<27" },
     { name = "poethepoet", specifier = ">=0.37,<1" },
     { name = "pydantic-ai-slim", extras = ["openrouter"], specifier = "==2.54.0" },
@@ -808,7 +808,7 @@ wheels = [
 
 [[package]]
 name = "openrouter"
-version = "1.3.32"
+version = "1.3.35"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpcore" },
@@ -816,9 +816,9 @@ dependencies = [
     { name = "jsonpath-python" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/35/b1/01ad4e2885da7b52e9a8928fea62fe69345be4c8f374c5c1702901b50faf/openrouter-1.3.32.tar.gz", hash = "sha256:bd242c8f53a4e3ab198d90b30e14c264ba6600f725f5f22068658113fa854036", size = 592026, upload-time = "2026-10-07T15:44:57.626Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/6a/bc412eab43676281fa8c2629788eeeeac3ac751c69b1a67f61871379f534/openrouter-1.3.35.tar.gz", hash = "sha256:4646f7051a83dab3b9685c58094034aa5ea214cf2de0377a4a4dbacdf45805e5", size = 591841, upload-time = "2026-10-08T18:12:51.933Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/09/00e0a7a23d3ca7d082798d9e0a2e89b7a1e6da6733dfec74eba690c0b9a4/openrouter-1.3.32-py3-none-any.whl", hash = "sha256:52b1b7216911eeb2426124cfc06fef32b7021a3d0e9a6d479ab4532d00336917", size = 1289612, upload-time = "2026-10-07T15:44:56.244Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/3d/559ff30ccc781d2ba77e34ac7587ee2e762c7ad491f22483212a16704144/openrouter-1.3.35-py3-none-any.whl", hash = "sha256:f81ff7cb6dd6fe50e38074e7456e2b2523a112fe97849c3d7e12403afdc42caa", size = 1289798, upload-time = "2026-10-08T18:12:50.596Z" },
 ]
 
 [[package]]
