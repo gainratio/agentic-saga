@@ -46,6 +46,9 @@ describe("live run view", () => {
     expect(
       screen.getByText(/so you're never left with a charged card and no delivery/),
     ).toBeVisible();
+    expect(
+      screen.getByText(/an AI agent \(software that carries out tasks for you\)/),
+    ).toBeVisible();
     expect(screen.getByText(/no real money moves and no AI service is called/)).toBeVisible();
   });
 
@@ -65,7 +68,7 @@ describe("live run view", () => {
     expect(screen.getByRole("status", { name: "Right now" })).toHaveTextContent(
       "Refunded the card, because the order can't go through.",
     );
-    expect(screen.getByRole("listitem", { name: "Charge the card: Undone" })).toBeVisible();
+    expect(screen.getByRole("listitem", { name: "Charge the card: Reversed" })).toBeVisible();
   });
 
   it("ends with a plain summary of the outcome", () => {

@@ -45,6 +45,8 @@ describe("plain live story", () => {
     );
     expect(statusOf(storyAt("business-failure", 9), "Check the order went through")).toBe("Failed");
     expect(statusOf(storyAt("business-failure", 9), "Book the delivery")).toBe("Done");
+    expect(statusOf(storyAt("business-failure", 10), "Cancel the delivery")).toBe("Up next");
+    expect(statusOf(storyAt("business-failure", 10), "Refund the card")).toBe("Waiting");
     expect(storyAt("business-failure", 10).caption).toBe(
       "The delivery company turned the order down, so the earlier steps are being undone, newest first.",
     );
@@ -55,9 +57,9 @@ describe("plain live story", () => {
 
     expect(story.caption).toBe("Refunded the card, because the order can't go through.");
     expect(statusOf(story, "Cancel the delivery")).toBe("Cancelled");
-    expect(statusOf(story, "Release the item")).toBe("Waiting");
-    expect(statusOf(story, "Book the delivery")).toBe("Undone");
-    expect(statusOf(story, "Charge the card")).toBe("Undone");
+    expect(statusOf(story, "Release the item")).toBe("Up next");
+    expect(statusOf(story, "Book the delivery")).toBe("Reversed");
+    expect(statusOf(story, "Charge the card")).toBe("Reversed");
     expect(statusOf(story, "Reserve the item")).toBe("Done");
   });
 

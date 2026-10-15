@@ -33,7 +33,7 @@ const STATUS: Readonly<Record<FlowStepState, string>> = {
   checking: "Checking…",
   complete: "Done",
   failed: "Failed",
-  reversed: "Undone",
+  reversed: "Reversed",
   waiting: "Waiting",
 };
 
@@ -103,8 +103,15 @@ export function plainLiveStory(projection: ReplayProjection): PlainStory {
     caption: captionFor(projection.currentEvent),
     forward: flow.forward.map(plainStep),
     summary: SUMMARY[projection.currentStatus] ?? null,
-    undo: flow.rollback.map(plainStep),
+    undo: markNextUndo(flow.rollback.map(plainStep), projection.currentStatus),
   };
+}
+
+/** While undoing, show which undo comes next so nothing looks stuck on "Waiting". */
+function markNextUndo(steps: readonly PlainStep[], status: string): readonly PlainStep[] {
+  if (status !== "compensating" || steps.some((step) => step.state === "active")) return steps;
+  const next = steps.findIndex((step) => step.state === "waiting");
+  return steps.map((step, index) => (index === next ? { ...step, status: "Up next" } : step));
 }
 
 /** A finished undo says what it did, so "Done" never sits next to "Undone". */

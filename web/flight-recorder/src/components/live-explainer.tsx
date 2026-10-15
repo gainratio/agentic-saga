@@ -19,9 +19,9 @@ export function LiveExplainer({ mode, projection }: LiveExplainerProps) {
       <p className={styles.eyebrow}>Live demo · running on your computer now</p>
       <h1 id="live-explainer-title">{TITLE}</h1>
       <p className={styles.intro}>
-        When an AI agent does a multi-step job like an online order, one step can fail after others
-        have already happened. This tool then undoes the earlier steps, newest first, so you're
-        never left with a charged card and no delivery.
+        When an AI agent (software that carries out tasks for you) does a multi-step job like an
+        online order, one step can fail after others have already happened. This tool then undoes
+        the earlier steps, newest first, so you're never left with a charged card and no delivery.
       </p>
       <div
         aria-label={finished ? "Result" : "Right now"}
