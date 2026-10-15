@@ -110,6 +110,24 @@ describe("automatic recording refresh", () => {
     expect(props.loadTrace).toHaveBeenCalledTimes(callsBeforePolling);
   });
 
+  it("checks every second while the catalog is a live run", async () => {
+    const props = fixture();
+    props.loadIndex.mockResolvedValue({ ok: true, value: { ...props.index, live: true } });
+    await act(async () => {
+      render(<App repository={props.repository} />);
+    });
+    const callsAfterLoad = props.loadIndex.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(props.loadIndex).toHaveBeenCalledTimes(callsAfterLoad + 1);
+    expect(screen.getByRole("status", { name: "Recording updates" })).toHaveTextContent(
+      "Live run: checks for new steps every second.",
+    );
+  });
+
   it("retries unavailable trace data even when the catalog digest stays unchanged", async () => {
     const props = fixture();
     props.loadTrace.mockResolvedValueOnce({ ok: false, message: "RunTrace could not be loaded." });

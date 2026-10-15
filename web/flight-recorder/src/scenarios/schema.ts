@@ -23,6 +23,7 @@ export const scenarioIndexSchema = z
   .object({
     schema_version: z.literal("1.0"),
     default_run_id: z.string().min(1).max(80).optional(),
+    live: z.boolean().optional(),
     runs: z.array(scenarioIndexEntrySchema).min(1).max(100),
   })
   .strict()

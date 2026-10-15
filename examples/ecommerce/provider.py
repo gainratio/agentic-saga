@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -57,14 +58,16 @@ class _Count:
 class EcommerceProvider:
     """Small idempotent provider simulation with authoritative business rules."""
 
-    def __init__(self, scenario: ScenarioName) -> None:
+    def __init__(self, scenario: ScenarioName, *, step_delay_seconds: float = 0.0) -> None:
         self.scenario = scenario
+        self.step_delay_seconds = step_delay_seconds
         self.state = ProviderState()
         self.events: list[str] = []
         self._counts: dict[str, _Count] = {}
         self._receipts: dict[str, JsonObject] = {}
 
     async def execute(self, tool: str, command: BaseModel, context: EffectContext) -> EffectOutcome:
+        await self._simulate_latency()
         self._record(tool, "execute")
         prior = self._receipts.get(context.operation_id)
         if prior is not None:
@@ -76,6 +79,7 @@ class EcommerceProvider:
         return self._repeat_result(tool, receipt)
 
     async def read(self, tool: str, command: BaseModel) -> BaseModel:
+        await self._simulate_latency()
         self._record(tool, "read")
         verified = command == InspectOrder(order_id=self.state.order_id)
         return OrderVerification(verified=verified and self.state.fulfillment == "scheduled")
@@ -104,6 +108,11 @@ class EcommerceProvider:
             for event in self.events
             if event.removeprefix("effect:") in _COMPENSATIONS
         )
+
+    async def _simulate_latency(self) -> None:
+        """Pause like a real network call so a live demo can show each step happen."""
+        if self.step_delay_seconds > 0:
+            await asyncio.sleep(self.step_delay_seconds)
 
     def _repeat_result(self, tool: str, receipt: JsonObject) -> EffectOutcome:
         if _response_is_lost(self.scenario, tool):

@@ -66,7 +66,7 @@ _PREREQUISITES = {
 }
 _DEMO_AUTHORIZATION_SECRET = secrets.token_bytes(32)
 _UNAUTHORIZED = "authz_untrusted_actor_0000001"
-_DEFINITION_VERSION = "ecommerce-temporal-v1"
+DEFINITION_VERSION = "ecommerce-temporal-v1"
 _MANIFEST_PATH = Path(__file__).with_name("saga.yaml")
 _INVARIANT_CHECKS = ("no_external_effects", "obligations_reversed", "order_verified")
 _HUMAN_WAIT_SECONDS = 60.0
@@ -158,7 +158,7 @@ class CheckoutAgent:
 
 async def run_scenario(scenario: ScenarioName | str) -> EcommerceRun:
     selected = ScenarioName(scenario)
-    return await _run_test_scenario(selected, _new_saga_id(selected))
+    return await _run_test_scenario(selected, new_saga_id(selected))
 
 
 async def run_fixture_scenario(scenario: ScenarioName | str) -> EcommerceRun:
@@ -188,17 +188,23 @@ async def run_with_client(
     scenario: ScenarioName | str,
     *,
     task_queue: str | None = None,
+    saga_id: str | None = None,
+    step_delay_seconds: float = 0.0,
 ) -> EcommerceRun:
     selected = ScenarioName(scenario)
-    saga_id = _new_saga_id(selected)
-    execution = _execution(client, selected, task_queue, saga_id)
+    workflow_id = saga_id or new_saga_id(selected)
+    execution = _execution(client, selected, task_queue, workflow_id, step_delay_seconds)
     return _demo_run(selected, await _run_workflow(execution, True))
 
 
 def _execution(
-    client: Client, selected: ScenarioName, task_queue: str | None, saga_id: str
+    client: Client,
+    selected: ScenarioName,
+    task_queue: str | None,
+    saga_id: str,
+    step_delay_seconds: float = 0.0,
 ) -> _Execution:
-    provider = EcommerceProvider(selected)
+    provider = EcommerceProvider(selected, step_delay_seconds=step_delay_seconds)
     registry = build_registry(provider)
     context = _manifest_context(registry)
     agent = CheckoutAgent(_EXPECTED_FORWARD)
@@ -460,7 +466,7 @@ def _demo_run(scenario: ScenarioName, completed: _Completion) -> EcommerceRun:
     return EcommerceRun(
         scenario=scenario,
         state=completed.state,
-        trace=project_run_trace(completed.state, definition_version=_DEFINITION_VERSION),
+        trace=project_run_trace(completed.state, definition_version=DEFINITION_VERSION),
         counts=provider.counts(),
         compensation_order=provider.compensation_order(),
         provider_events=tuple(provider.events),
@@ -472,7 +478,8 @@ def _demo_run(scenario: ScenarioName, completed: _Completion) -> EcommerceRun:
     )
 
 
-def _new_saga_id(scenario: ScenarioName) -> str:
+def new_saga_id(scenario: ScenarioName) -> str:
+    """Return a fresh Workflow ID so repeated demo runs never collide."""
     material = f"{scenario.value}:{asyncio.get_running_loop().time()}"
     return f"saga_{sha256(material.encode()).hexdigest()}"
 
@@ -483,8 +490,10 @@ def _fixture_saga_id(scenario: ScenarioName) -> str:
 
 
 __all__ = [
+    "DEFINITION_VERSION",
     "CheckoutAgent",
     "EcommerceRun",
+    "new_saga_id",
     "run_fixture_scenario",
     "run_scenario",
     "run_with_client",

@@ -22,13 +22,20 @@ type LoadState<Value> =
   | { readonly kind: "pending" }
   | { readonly kind: "ready"; readonly value: Value };
 const pending: LoadState<never> = { kind: "pending" };
+const RECORDING_REFRESH_MS = 3_000;
+const LIVE_REFRESH_MS = 1_000;
 
 export function App({ repository }: AppProps) {
   const { state, freshness, lastChecked } = useIndex(repository);
+  const live = state.kind === "ready" && state.value.live === true;
   const status = (
     <div aria-label="Recording updates" className={styles.freshness} role="status">
       <strong>{freshness}</strong>
-      <span>Auto-refresh checks recordings every 3 seconds.</span>
+      <span>
+        {live
+          ? "Live run: checks for new steps every second."
+          : "Auto-refresh checks recordings every 3 seconds."}
+      </span>
       {lastChecked ? <span>Last checked {lastChecked.toLocaleTimeString()}</span> : null}
     </div>
   );
@@ -150,7 +157,9 @@ function useIndex(repository: ScenarioRepository) {
       setFreshness("Checking for updates");
       const result = await repository.loadIndex(controller.signal);
       if (controller.signal.aborted) return;
+      let delay = RECORDING_REFRESH_MS;
       if (result.ok) {
+        if (result.value.live === true) delay = LIVE_REFRESH_MS;
         setState((previous) =>
           previous.kind === "ready" &&
           JSON.stringify(previous.value) === JSON.stringify(result.value)
@@ -163,7 +172,7 @@ function useIndex(repository: ScenarioRepository) {
         setFreshness("Reconnecting — showing last available recording");
         setState((previous) => (previous.kind === "ready" ? previous : toLoadState(result)));
       }
-      timer = window.setTimeout(check, 3_000);
+      timer = window.setTimeout(check, delay);
     };
     void check();
     return () => {

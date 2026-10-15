@@ -34,6 +34,7 @@ interface FocusReturn {
 
 export function RecorderWorkbench(props: RecorderWorkbenchProps) {
   const { assessments = {}, entry, index, onSelectRun, trace } = props;
+  const live = index.live === true;
   const reducedMotion = useReducedMotion();
   const pauseAfter = useMemo(() => replayWaypoints(trace), [trace]);
   const replay = useReplay({
@@ -71,10 +72,11 @@ export function RecorderWorkbench(props: RecorderWorkbenchProps) {
 
   return (
     <main className={styles.workbench}>
-      <OutcomeHeader entry={entry} projection={recordedOutcome} />
+      <OutcomeHeader entry={entry} live={live} projection={recordedOutcome} />
       <p className={styles.authorityChain}>
-        {provenanceDescription(entry.mode)} Replay only reads recorded evidence. The local server
-        stays open to serve this page.
+        {live
+          ? LIVE_PROVENANCE
+          : `${provenanceDescription(entry.mode)} Replay only reads recorded evidence. The local server stays open to serve this page.`}
       </p>
       <ScenarioResults assessments={assessments} index={index} />
       {entry.presentation === "ecommerce" ? (
@@ -227,6 +229,9 @@ export function RunTrajectory({ assessments = {}, entry, index, onSelect }: Traj
     </nav>
   );
 }
+
+const LIVE_PROVENANCE =
+  "Live run on a local Temporal server · Scripted agent and simulated shop services: no API key, no model calls · This page reads the run's record as the workflow writes it.";
 
 function recordingLabel(mode: ScenarioIndexEntry["mode"]): string {
   if (mode === "scripted") return "Scripted recording";
