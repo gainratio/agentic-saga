@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -21,7 +22,7 @@ from temporalio.testing import WorkflowEnvironment
 from agentic_saga.contracts.runtime import SagaStatus
 from agentic_saga.contracts.trace import RunTrace
 from examples.ecommerce.domain import ScenarioName
-from examples.ecommerce.live import follow_run
+from examples.ecommerce.live import follow_run, main
 
 pytestmark = pytest.mark.temporal
 
@@ -141,3 +142,48 @@ async def test_demo_command_serves_the_live_run_in_the_recorder(
     assert trace.outcome is SagaStatus.COMPENSATED_VERIFIED
     assert "<div id=" in page
     assert code == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("scenario", "moment"),
+    [
+        (ScenarioName.LOST_RESPONSE, "outcome_unknown"),
+        (ScenarioName.COMPENSATION_FAILURE, "human_required"),
+    ],
+)
+async def test_follow_run_shows_the_moment_each_scenario_is_about(
+    environment: WorkflowEnvironment, scenario: ScenarioName, moment: str
+) -> None:
+    # Given: the browser only sees what a poll catches, so each key moment must outlast a poll
+    published: list[RunTrace] = []
+
+    # When
+    await follow_run(
+        environment.client, scenario, published.append, step_delay_seconds=0.6, poll_seconds=0.25
+    )
+
+    # Then
+    def last_moment(trace: RunTrace) -> str:
+        last = trace.events[-1]
+        kind = (last.redacted_output or {}).get("kind")
+        return str(kind) if last.event_type.endswith("recorded") and kind else last.event_type
+
+    assert moment in {last_moment(trace) for trace in published}
+
+
+def test_demo_refuses_a_busy_port_before_starting_anything(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+
+        # When
+        code = main(["--no-open", "--port", str(port)])
+
+    # Then
+    assert code == 2
+    assert f"Port {port} is already in use" in capsys.readouterr().out

@@ -88,6 +88,40 @@ describe("plain live story", () => {
     );
   });
 
+  it("says who stands in for the person when the demo signs off", () => {
+    const recorded = trace("compensation-failure");
+    const resolved = recorded.events.at(-1);
+    if (!resolved) throw new Error("fixture must have events");
+    const withResolution = {
+      ...recorded,
+      events: [
+        ...recorded.events,
+        { ...resolved, event_id: "evt_resolved", event_type: "human_resolved", saga_seq: 15 },
+      ],
+    };
+
+    expect(plainLiveStory(projectReplay(withResolution, 14)).caption).toBe(
+      "The person confirmed the refund (in this demo, the script plays that person). Finishing the undo.",
+    );
+  });
+
+  it("treats a pause for a person as part of a run that is still going", () => {
+    const story = plainLiveStory(projectReplay(trace("compensation-failure"), 13), {
+      runFinished: false,
+    });
+
+    expect(story.summary).toBeNull();
+    expect(story.caption).toBe(
+      "Paused: a person must confirm the refund before anything else happens.",
+    );
+  });
+
+  it("says the lost reply was settled when the agent moves on right after", () => {
+    expect(storyAt("lost-response", 7).caption).toBe(
+      "The card company confirmed one charge. Booking the delivery…",
+    );
+  });
+
   it("explains a safe stop that needs a person", () => {
     const story = storyAt("compensation-failure", 14);
 

@@ -52,6 +52,12 @@ describe("live run view", () => {
     expect(screen.getByText(/no real money moves and no AI service is called/)).toBeVisible();
   });
 
+  it("names the browser tab in plain words", () => {
+    render(<LiveRecorder {...liveProps(unfinished(4))} onSelectRun={vi.fn()} />);
+
+    expect(document.title).toBe("What if an AI agent's order fails halfway?");
+  });
+
   it("captions what is happening right now and shows each step's status", () => {
     render(<LiveRecorder {...liveProps(unfinished(4))} onSelectRun={vi.fn()} />);
 

@@ -185,9 +185,10 @@ driver = build_openrouter_decisions_driver(
 ```
 
 The alternatives are Jev called directly through its maker TypeSafe's own API (`build_jev_driver`
-with `TYPESAFE_API_KEY`), any model through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a
-scripted driver like the one in the demo. All four are in the
-[agent adapter guide](docs/agent-adapter.md), with a full runnable example.
+with `TYPESAFE_API_KEY`), any model that supports tool calling through
+[Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a scripted driver like the one in the
+demo. All four are in the [agent adapter guide](docs/agent-adapter.md), with a full runnable
+example.
 
 ### The browser page
 

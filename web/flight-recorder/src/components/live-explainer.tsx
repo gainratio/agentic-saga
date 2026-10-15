@@ -5,19 +5,20 @@ import styles from "./live-explainer.module.css";
 
 export interface LiveExplainerProps {
   readonly mode: ScenarioIndexEntry["mode"];
+  readonly runFinished: boolean;
   readonly projection: ReplayProjection;
 }
 
-const TITLE = "What if an AI agent's order fails halfway?";
+export const LIVE_TITLE = "What if an AI agent's order fails halfway?";
 
 /** The live demo told for anyone: what the tool is for, what is happening now, and the result. */
-export function LiveExplainer({ mode, projection }: LiveExplainerProps) {
-  const story = plainLiveStory(projection);
+export function LiveExplainer({ mode, projection, runFinished }: LiveExplainerProps) {
+  const story = plainLiveStory(projection, { runFinished });
   const finished = story.summary !== null;
   return (
     <section aria-labelledby="live-explainer-title" className={styles.explainer}>
       <p className={styles.eyebrow}>Live demo · running on your computer now</p>
-      <h1 id="live-explainer-title">{TITLE}</h1>
+      <h1 id="live-explainer-title">{LIVE_TITLE}</h1>
       <p className={styles.intro}>
         When an AI agent (software that carries out tasks for you) does a multi-step job like an
         online order, one step can fail after others have already happened. This tool then undoes

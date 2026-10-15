@@ -221,7 +221,9 @@ async def _run_workflow(execution: _Execution, resolve_human: bool) -> _Completi
             return _completed(execution.provider, execution.agent, await handle.result())
         if not resolve_human:
             return await _capture_human_stop(execution, handle)
-        state, pause, stale, unauthorized = await _resolve_human_stop(handle)
+        # A live demo holds the pause on screen for a moment, as a person would take a while.
+        pause_seconds = execution.provider.step_delay_seconds * 2
+        state, pause, stale, unauthorized = await _resolve_human_stop(handle, pause_seconds)
         return _Completion(execution.provider, execution.agent, state, pause, stale, unauthorized)
 
 
@@ -257,8 +259,10 @@ async def _start(
 
 async def _resolve_human_stop(
     handle: WorkflowHandle[AgenticSagaWorkflow, WorkflowState],
+    pause_seconds: float = 0.0,
 ) -> tuple[WorkflowState, SagaStatus, bool, bool]:
     state = await _wait_for_human(handle)
+    await asyncio.sleep(pause_seconds)
     unresolved = next(item for item in state.compensations if item.state == "unresolved")
     operation_id = unresolved.compensation_identity.operation_id
     stale, unauthorized = await _rejected_resolutions(handle, state, operation_id)

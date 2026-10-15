@@ -87,6 +87,7 @@ class EcommerceProvider:
     async def reconcile(
         self, tool: str, command: BaseModel, context: ReconcileContext
     ) -> ReconciliationOutcome:
+        await self._simulate_latency()
         self._count(tool).reconciliations += 1
         self.events.append(f"reconcile:{tool}")
         if self.scenario is ScenarioName.COMPENSATION_FAILURE and tool == "refund_payment":

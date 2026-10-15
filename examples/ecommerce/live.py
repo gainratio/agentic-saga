@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import sys
 import webbrowser
 from collections.abc import AsyncIterator, Callable
@@ -238,6 +239,9 @@ def quiet_simulated_failures() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
+    if not _port_is_free(arguments.port):
+        _say(f"Port {arguments.port} is already in use. Pick another with --port, or omit it.")
+        return 2
     quiet_simulated_failures()
     _intro(arguments)
     with ExitStack() as stack:
@@ -284,6 +288,18 @@ def _port(value: str) -> int:
     if not 0 <= port <= _MAX_PORT:
         raise argparse.ArgumentTypeError("port must be between 0 and 65535")
     return port
+
+
+def _port_is_free(port: int) -> bool:
+    """Check a requested port before starting Temporal, so a clash fails fast and clearly."""
+    if port == 0:
+        return True
+    with socket.socket() as probe:
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
 
 
 def _say(message: str) -> None:

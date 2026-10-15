@@ -71,7 +71,8 @@ const FIXED_CAPTIONS: Readonly<Record<string, string>> = {
   compensation_started:
     "The delivery company turned the order down, so the earlier steps are being undone, newest first.",
   human_required: "Paused: a person must confirm the refund before anything else happens.",
-  human_resolved: "A person confirmed the refund. Finishing the undo.",
+  human_resolved:
+    "The person confirmed the refund (in this demo, the script plays that person). Finishing the undo.",
   saga_started: "Starting the order.",
   terminal_assigned: "Finished.",
 };
@@ -93,16 +94,29 @@ const CAPTION_RULES: Readonly<Record<string, CaptionRule>> = {
       : "The final check failed: the delivery company turned the order down.",
   reconciliation_recorded: (event) =>
     outputKind(event) === "reconcile_effect_confirmed"
-      ? "The card company confirmed one charge. Carrying on."
+      ? `${SETTLED_REPLY} Carrying on.`
       : "Asking the card company whether the refund went through…",
 };
 
-export function plainLiveStory(projection: ReplayProjection): PlainStory {
+export interface PlainStoryOptions {
+  /** False while the run is still going: a pause for a person is then not the end. */
+  readonly runFinished?: boolean;
+}
+
+/** Statuses that end a run. A pause for a person only ends a run that has stopped. */
+const FINAL_STATUSES = new Set(["aborted_clean", "compensated_verified", "succeeded_verified"]);
+
+export function plainLiveStory(
+  projection: ReplayProjection,
+  options: PlainStoryOptions = {},
+): PlainStory {
   const flow = projectEcommerceFlow(projection);
+  const status = projection.currentStatus;
+  const ended = FINAL_STATUSES.has(status) || options.runFinished !== false;
   return {
-    caption: captionFor(projection.currentEvent),
+    caption: captionWithContext(projection.events, projection.currentEvent),
     forward: flow.forward.map(plainStep),
-    summary: SUMMARY[projection.currentStatus] ?? null,
+    summary: ended ? (SUMMARY[status] ?? null) : null,
     undo: markNextUndo(flow.rollback.map(plainStep), projection.currentStatus),
   };
 }
@@ -135,6 +149,17 @@ function plainStep(step: FlowStep): PlainStep {
 /** Only the final check fails; the steps before it did happen until they are undone. */
 function settledState(step: FlowStep): FlowStepState {
   return step.state === "failed" && step.id !== "verify-order" ? "complete" : step.state;
+}
+
+const SETTLED_REPLY = "The card company confirmed one charge.";
+
+/** When the agent moves on at once, keep the news that let it move on. */
+function captionWithContext(events: readonly TraceEvent[], current: TraceEvent): string {
+  const previous = events.at(-2);
+  const settled =
+    current.event_type === "agent_decision_recorded" &&
+    previous?.event_type === "reconciliation_recorded";
+  return settled ? `${SETTLED_REPLY} ${captionFor(current)}` : captionFor(current);
 }
 
 function captionFor(event: TraceEvent): string {
