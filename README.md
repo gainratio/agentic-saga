@@ -34,9 +34,9 @@ uv run poe demo
 
 The command starts a throwaway Temporal server on your machine (the first run downloads Python,
 the dependencies, and Temporal: under a minute on a fast connection), runs one checkout on it, and
-opens the page above. If no browser can open, it prints the page's address instead. The page explains itself in plain
-words, so you can show it to someone who doesn't write code. Each step takes about a second and a
-half so you can follow it:
+opens the page above. If no browser can open, it prints the page's address instead. The page
+explains itself in plain words, so you can show it to someone who doesn't write code. Each step
+takes about a second and a half so you can follow it:
 
 1. The agent reserves the item, charges the card, and books the delivery.
 2. The final check fails: the delivery company turned the order down.

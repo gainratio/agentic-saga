@@ -226,6 +226,11 @@
   font-size: 0.68rem;
 }
 
+/* A timestamp reads as one value; don't let it wrap at its hyphens. */
+.ledger td[data-label="Recorded"] {
+  white-space: nowrap;
+}
+
 .ledger button {
   padding: 4px 7px;
   border: 1px solid var(--authorized);

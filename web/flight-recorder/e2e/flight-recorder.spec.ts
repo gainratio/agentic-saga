@@ -494,6 +494,19 @@ async function wordsSplitAcrossLines(page: Page, tableName: string): Promise<str
   });
 }
 
+async function linesPerRecordedTime(page: Page): Promise<number[]> {
+  const cells = page
+    .getByRole("table", { name: "Recorded ledger" })
+    .locator('td[data-label="Recorded"]');
+  return cells.evaluateAll((elements) =>
+    elements.map((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    }),
+  );
+}
+
 test("live developer tables keep words whole at a 1280-pixel laptop width", async ({ page }) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   const evidence = await openLiveRecorder(page);
@@ -502,6 +515,9 @@ test("live developer tables keep words whole at a 1280-pixel laptop width", asyn
   expect(await wordsSplitAcrossLines(page, "Causal story")).toEqual([]);
   await page.getByRole("tab", { name: "Ledger" }).click();
   expect(await wordsSplitAcrossLines(page, "Recorded ledger")).toEqual([]);
+  const recordedTimes = await linesPerRecordedTime(page);
+  expect(recordedTimes.length).toBeGreaterThan(0);
+  expect(recordedTimes.filter((lines) => lines !== 1)).toEqual([]);
   expect(evidence.consoleErrors).toEqual([]);
   expect(evidence.pageErrors).toEqual([]);
 });
