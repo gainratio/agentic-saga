@@ -8,6 +8,12 @@ All notable changes to Agentic Saga are documented here. The format follows
 
 ### Added
 
+- `uv run poe demo`: one command that starts a throwaway local Temporal server, runs a checkout
+  saga with a scripted agent (no API key), and shows it live in the Flight Recorder as each step
+  runs, fails, and is undone.
+- `examples/quickstart/trip.py`: the smallest complete program using the library, with a test, and
+  a README section cut from it verbatim.
+- `docs/integration.md`: how to use the library in your own app. `QUICKSTART.md` now points to it.
 - A four-scenario recorder catalog with stable outcome summaries, explicit agent provenance,
   replay status, and `python -m examples.ecommerce.run all --open` for fresh local runs.
 - Automatic recording refresh, reconnect status, and page updates when a rebuilt UI is served.

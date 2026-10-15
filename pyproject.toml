@@ -96,12 +96,15 @@ include = [
   "/docs/NORTHSTAR-REVIEW.md",
   "/docs/adr",
   "/docs/agent-adapter.md",
+  "/docs/assets",
+  "/docs/integration.md",
   "/docs/architecture",
   "/docs/context-manifest.md",
   "/docs/flight-recorder.md",
   "/docs/temporal-safety-contract.md",
   "/docs/operations.md",
   "/examples/ecommerce",
+  "/examples/quickstart",
   "/examples/ticket-booking/saga.yaml",
   "/pyproject.toml",
   "/src/agentic_saga",
@@ -181,6 +184,7 @@ release-script-coverage = "python -m scripts.release_runner --check-release-cove
 test-network = "pytest -m 'network' --force-enable-socket"
 mutation = "python scripts/run_mutation_gate.py"
 gate = ["lint-check", "format-check", "typecheck", "typecheck-release", "complexity", "test", "test-temporal", "core-coverage", "release-script-test", "release-script-coverage"]
+demo = "python -m examples.ecommerce.live"
 artifacts = "bash scripts/build_release_artifacts.sh dist/release"
 release-candidate = "bash scripts/verify_release_candidate.sh dist/release"
 
