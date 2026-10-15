@@ -21,6 +21,8 @@ import { type RecorderView, ViewTabs } from "./view-tabs";
 
 export interface RecorderWorkbenchProps {
   readonly assessments?: ScenarioAssessments;
+  /** Render inside another page's main landmark instead of as the page itself. */
+  readonly embedded?: boolean;
   readonly entry: ScenarioIndexEntry;
   readonly index: ScenarioIndex;
   readonly onSelectRun: (runId: string) => void;
@@ -33,7 +35,8 @@ interface FocusReturn {
 }
 
 export function RecorderWorkbench(props: RecorderWorkbenchProps) {
-  const { assessments = {}, entry, index, onSelectRun, trace } = props;
+  const { assessments = {}, embedded = false, entry, index, onSelectRun, trace } = props;
+  const Landmark = embedded ? "div" : "main";
   const live = index.live === true;
   const reducedMotion = useReducedMotion();
   const pauseAfter = useMemo(() => replayWaypoints(trace), [trace]);
@@ -71,12 +74,10 @@ export function RecorderWorkbench(props: RecorderWorkbenchProps) {
   const causalIds = causalEventIds(projection.flight, selectedEventId);
 
   return (
-    <main className={styles.workbench}>
+    <Landmark className={styles.workbench}>
       <OutcomeHeader entry={entry} live={live} projection={recordedOutcome} />
       <p className={styles.authorityChain}>
-        {live
-          ? LIVE_PROVENANCE
-          : `${provenanceDescription(entry.mode)} Replay only reads recorded evidence. The local server stays open to serve this page.`}
+        {provenanceDescription(entry.mode)} {live ? LIVE_SOURCE : RECORDED_SOURCE}
       </p>
       <ScenarioResults assessments={assessments} index={index} />
       {entry.presentation === "ecommerce" ? (
@@ -113,7 +114,7 @@ export function RecorderWorkbench(props: RecorderWorkbenchProps) {
           {...(returnTarget ? { onReturnFocus: () => restoreFocus(returnTarget) } : {})}
         />
       </div>
-    </main>
+    </Landmark>
   );
 
   function restoreFocus(target: FocusReturn): void {
@@ -209,7 +210,12 @@ export function RunTrajectory({ assessments = {}, entry, index, onSelect }: Traj
   return (
     <nav aria-label="Run trajectory" className={styles.trajectory}>
       <h2>Choose a scenario</h2>
-      <p>{index.runs.length} recorded scenarios. Select one to inspect its outcome and replay.</p>
+      <p>
+        {index.runs.length === 1
+          ? "1 recorded scenario"
+          : `${index.runs.length} recorded scenarios`}
+        . Select one to inspect its outcome and replay.
+      </p>
       <ul>
         {index.runs.map((run) => (
           <li key={run.id}>
@@ -230,8 +236,10 @@ export function RunTrajectory({ assessments = {}, entry, index, onSelect }: Traj
   );
 }
 
-const LIVE_PROVENANCE =
-  "Live run on a local Temporal server · Scripted agent and simulated shop services: no API key, no model calls · This page reads the run's record as the workflow writes it.";
+const LIVE_SOURCE =
+  "Live run on a local Temporal server: this page reads the run's record as the workflow writes it.";
+const RECORDED_SOURCE =
+  "Replay only reads recorded evidence. The local server stays open to serve this page.";
 
 function recordingLabel(mode: ScenarioIndexEntry["mode"]): string {
   if (mode === "scripted") return "Scripted recording";

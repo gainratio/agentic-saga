@@ -32,7 +32,7 @@ uv run poe gate            # 1 min 7 s to 1 min 17 s
 (grade A everywhere), the offline tests, the Temporal tests, and two branch-coverage checks (90%
 minimum on the library and on the release scripts). It stops at the first failure.
 
-Success ends like this (944 offline tests, 39 Temporal tests, 65 release-script tests):
+Success ends like this (about 950 offline tests, 39 Temporal tests, 65 release-script tests):
 
 ```text
 Poe => python -m scripts.release_runner --check-python-coverage .coverage.json

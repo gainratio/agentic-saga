@@ -18,7 +18,7 @@ the undo cannot be proven, it stops and waits for a person.
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Use it in your app](docs/integration.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Agent adapters](docs/agent-adapter.md) · [Safety rules](docs/temporal-safety-contract.md) · [Operations](docs/operations.md)
 
-![The live demo in the browser: a checkout reserves stock, charges the card and books delivery; the final check fails; the page then shows the delivery cancelled, the card refunded and the stock released, ending in "Safely undone"](docs/assets/live-demo.gif)
+![The live demo page: "What if an AI agent's order fails halfway?" Steps reserve the item, charge the card and book the delivery turn Done; the final check fails; a caption explains the delivery company turned the order down; the delivery is cancelled, the card refunded and the item released; the result says nothing was left half-done](docs/assets/live-demo.gif)
 
 ## Try it
 
@@ -33,59 +33,44 @@ uv run poe demo
 ```
 
 The command starts a throwaway Temporal server on your machine (the first run downloads it, about
-a minute), runs one checkout saga on it, and opens the page above. Each step takes about a second
-and a half so you can follow it:
+a minute), runs one checkout on it, and opens the page above. The page explains itself in plain
+words, so you can show it to someone who doesn't write code. Each step takes about a second and a
+half so you can follow it:
 
-1. The agent reserves the stock, charges the card, and books the delivery. Each box turns green.
-2. The final check fails: the delivery company refused the order.
-3. The workflow undoes the finished steps newest-first: cancel the delivery, refund the card,
-   release the stock.
-4. The page shows the result, **Safely undone**, with each undo confirmed.
+1. The agent reserves the item, charges the card, and books the delivery.
+2. The final check fails: the delivery company turned the order down.
+3. The earlier steps are undone, newest first: cancel the delivery, refund the card, release the
+   item. A caption says what is happening and why.
+4. The page ends with a plain summary: nothing was left half-done.
 
-The "agent" in this demo is a fixed script and the shop services are simulations, so no AI model
-is called. The page says so in its dark banner. Your terminal shows the same run (this is a real
-run; the port numbers change each time):
+The agent in this demo is a fixed script and the shop is simulated, so no money moves and no AI
+model is called. The page says so. Developers can open **Technical details for developers** for
+the full record of every step. Your terminal shows the same run (a real run, shortened; port
+numbers change each time):
 
 ```text
 Agentic Saga live demo: business-failure (delivery fails after payment, so earlier steps are undone).
 Mode: scripted agent, simulated shop services, no API key, no model calls.
 Temporal: starting a throwaway local server (the first run downloads it once)…
-Temporal CLI 1.9.1 (Server 1.32.0, UI 2.54.1)
-
-Temporal Server:      localhost:62953
-Temporal Persistence: in-memory
-Temporal Metrics:     http://localhost:62955/metrics
-  01 saga_started -> running
-  02 agent_decision_recorded reserve_inventory -> running
 Recorder: http://127.0.0.1:62969  (this page updates every second)
-  03 effect_outcome_recorded reserve_inventory -> running
-  04 agent_decision_recorded charge_payment -> running
-  05 effect_outcome_recorded charge_payment -> running
-  06 agent_decision_recorded schedule_fulfillment -> running
-  07 effect_outcome_recorded schedule_fulfillment -> running
-  08 agent_decision_recorded verify_order -> running
+  …
   09 invariant_evaluated verify_order -> running
   10 compensation_started -> compensating
   11 compensation_outcome_recorded cancel_fulfillment -> compensating
-  12 compensation_outcome_recorded refund_payment -> compensating
-  13 compensation_outcome_recorded release_inventory -> compensating
-  14 compensation_completed -> compensating
+  …
   15 terminal_assigned -> compensated_verified
 Live run finished: compensated_verified. Press Ctrl+C to stop the page.
 ```
 
-The page stays open after the run so you can click **Watch from start** to replay it, or open any
-step for its details. Press Ctrl+C to stop. Three other runs show the other cases:
+The page stays open after the run. Press Ctrl+C to stop. Three other runs show the other cases:
 
 ```bash
 uv run poe demo happy-path            # every step works
-uv run poe demo lost-response         # the payment reply is lost; it is checked, not repeated
-uv run poe demo compensation-failure  # the refund can't be proven, so a person must sign off
+uv run poe demo lost-response         # the card company's reply is lost; it asks, not charges again
+uv run poe demo compensation-failure  # the refund can't be confirmed, so a person must sign off
 ```
 
-In the last two, the terminal also prints a Python traceback ending in
-`BusinessToolAdapterFailure`. That is the simulated lost reply, and it is expected. In
-`compensation-failure` the demo plays the person and signs off for them, so the undo can finish.
+In `compensation-failure` the demo plays the person and signs off for them, so the undo can finish.
 
 Add `--step-delay 0` to run at full speed, or `--temporal-address localhost:7233` to use a
 Temporal server you already started with `temporal server start-dev`. You can see that server's
@@ -134,9 +119,9 @@ WORKFLOW_TOOLS = (
 )
 ```
 
-Finally, start a worker and the saga, and wait for the result. Here the agent is a script; swap in
-a model-backed one from the [agent adapter guide](docs/agent-adapter.md) without changing anything
-else:
+Finally, start a worker and the saga, and wait for the result. Here the agent is a script. To use
+a model instead, build a driver from the [agent adapter guide](docs/agent-adapter.md) and pass it in
+place of `ScriptedAgent()`; it also needs a function that lists the allowed steps:
 
 ```python
     activities = TemporalActivities(ScriptedAgent(), build_registry(forward, undo), BUDGET)
@@ -163,6 +148,9 @@ Forward steps: book_flight -> book_hotel -> confirm_trip
 Undo steps:    cancel_hotel -> cancel_flight
 Outcome:       compensated_verified
 ```
+
+Temporal's test server may print one `WARN ... Temporal Server 1.16.0 or newer is required` line
+first. It is harmless.
 
 The code above is cut straight from that file, and a test runs the file, so this section cannot
 drift from what works. The [integration guide](docs/integration.md) explains each part, the rules
@@ -196,8 +184,8 @@ driver = build_openrouter_decisions_driver(
 )
 ```
 
-The alternatives are Jev called directly from TypeSafe (`build_jev_driver` with
-`TYPESAFE_API_KEY`), any model through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a
+The alternatives are Jev called directly through its maker TypeSafe's own API (`build_jev_driver`
+with `TYPESAFE_API_KEY`), any model through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a
 scripted driver like the one in the demo. All four are in the
 [agent adapter guide](docs/agent-adapter.md), with a full runnable example.
 
@@ -205,7 +193,7 @@ scripted driver like the one in the demo. All four are in the
 
 The browser page is the Flight Recorder, a small React app bundled with the library. It reads the
 run's record and draws it; it never runs anything itself. `uv run poe demo` serves it while the run
-is still going. `uv run agentic-saga demo --open` serves four recorded runs without Temporal.
+is still going, with a plain-language view on top and the full developer view folded underneath. `uv run agentic-saga demo --open` serves four recorded runs without Temporal.
 
 ## What it does not do
 

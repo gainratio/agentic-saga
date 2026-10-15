@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 import shutil
 import sys
@@ -230,8 +231,14 @@ def _serve_until_stopped(view: _LiveView, run: EcommerceRun) -> None:
         view.server.wait()
 
 
+def quiet_simulated_failures() -> None:
+    """The lost-reply scenarios fail an activity on purpose; don't print those as tracebacks."""
+    logging.getLogger("temporalio.activity").setLevel(logging.ERROR)
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
+    quiet_simulated_failures()
     _intro(arguments)
     with ExitStack() as stack:
         workspace = Path(stack.enter_context(TemporaryDirectory(prefix="agentic-saga-live-")))

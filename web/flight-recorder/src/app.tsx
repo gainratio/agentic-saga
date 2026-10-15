@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import styles from "./app.module.css";
+import { LiveRecorder } from "./components/live-recorder";
 import { RecorderWorkbench, RunTrajectory } from "./components/recorder-workbench";
 import type { LoadResult, ScenarioRepository } from "./scenarios/repository";
 import type { ScenarioIndex, ScenarioIndexEntry } from "./scenarios/schema";
@@ -33,7 +34,7 @@ export function App({ repository }: AppProps) {
       <strong>{freshness}</strong>
       <span>
         {live
-          ? "Live run: checks for new steps every second."
+          ? "This page updates every second."
           : "Auto-refresh checks recordings every 3 seconds."}
       </span>
       {lastChecked ? <span>Last checked {lastChecked.toLocaleTimeString()}</span> : null}
@@ -103,6 +104,17 @@ function ReadyRecorder({ index, repository }: ReadyProps) {
         kind="loading"
         message="Loading selected RunTrace…"
         onSelect={setSelectedId}
+      />
+    );
+  }
+  if (index.live === true) {
+    return (
+      <LiveRecorder
+        assessments={assessments}
+        entry={entry}
+        index={index}
+        onSelectRun={setSelectedId}
+        trace={state.value}
       />
     );
   }

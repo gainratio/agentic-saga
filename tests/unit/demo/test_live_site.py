@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import tomllib
 from hashlib import sha256
 from pathlib import Path
@@ -174,3 +175,18 @@ async def test_state_query_raises_any_other_temporal_error() -> None:
     # When / Then
     with pytest.raises(RPCError, match="server unavailable"):
         await live._current_state(cast(Any, handle))
+
+
+def test_demo_hides_tracebacks_for_failures_the_scenarios_simulate() -> None:
+    # Given
+    logger = logging.getLogger("temporalio.activity")
+    before = logger.level
+
+    # When
+    live.quiet_simulated_failures()
+
+    # Then
+    try:
+        assert logger.getEffectiveLevel() == logging.ERROR
+    finally:
+        logger.setLevel(before)

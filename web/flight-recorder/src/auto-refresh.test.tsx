@@ -124,7 +124,7 @@ describe("automatic recording refresh", () => {
 
     expect(props.loadIndex).toHaveBeenCalledTimes(callsAfterLoad + 1);
     expect(screen.getByRole("status", { name: "Recording updates" })).toHaveTextContent(
-      "Live run: checks for new steps every second.",
+      "This page updates every second.",
     );
   });
 

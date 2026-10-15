@@ -15,9 +15,14 @@ Temporal server (`WorkflowEnvironment.start_local()`, downloaded on first use), 
 saga with a scripted agent and simulated providers, and serves the recorder while the workflow is
 still running. Each time the workflow records new events, the script writes a fresh trace under a
 new file name and then points `traces/index.json` at it, with `"live": true` in the index. When the
-browser sees `live`, it checks every second instead of every three, titles the page
-"Agentic Saga · live run", and shows **Running** or **Undoing earlier steps** until the outcome is
-recorded. The banner states that the agent is scripted and no model is called.
+browser sees `live`, it checks every second instead of every three and shows a plain-language
+page meant for anyone, not only developers (`src/components/live-explainer.tsx`): one question as
+the title, two sentences on why the tool exists, a "Right now" caption that says what is happening
+and why, each step in everyday words ("Charge the card", "Refund the card"), and a plain summary at
+the end. The wording lives in `src/story/plain-live-story.ts`, and a test fails if words like
+"saga", "workflow" or "compensation" reach that view. The full developer recorder is folded under
+**Technical details for developers**; its header reads "Agentic Saga · live run" and shows
+**Running** or **Undoing earlier steps** until the outcome is recorded.
 
 Pass a scenario name to watch another case, `--step-delay SECONDS` to change the simulated
 provider latency (default 1.5), `--temporal-address HOST:PORT` to use a server you already run,
