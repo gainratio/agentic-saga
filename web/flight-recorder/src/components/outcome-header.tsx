@@ -15,14 +15,11 @@ export function OutcomeHeader({ entry, live = false, projection }: OutcomeHeader
     <header className={styles.stateStrip}>
       <div className={styles.brand}>
         <h1>{live ? "Agentic Saga · live run" : "Agentic Saga Replay"}</h1>
-        <p>{(live && liveSummary(status)) || outcomeSummary(entry, status)}</p>
+        <p>{headerSummary(entry, status, live)}</p>
       </div>
       <dl className={styles.runFacts}>
         <Fact label="Scenario" value={entry.name} />
-        <Fact
-          label={live ? "Status" : "Recorded outcome"}
-          value={(live && liveStatusLabel(status)) || statusLabel(status)}
-        />
+        <Fact label={live ? "Status" : "Recorded outcome"} value={headerStatus(status, live)} />
         <Fact label="Final safety checks" value={proofLabel(projection)} />
       </dl>
     </header>
@@ -66,6 +63,16 @@ function statusLabel(value: string): string {
     aborted_clean: "Stopped without changes",
   };
   return labels[value] ?? title(value);
+}
+
+function headerSummary(entry: ScenarioIndexEntry, status: string, live: boolean): string {
+  const running = live ? liveSummary(status) : undefined;
+  return running ?? outcomeSummary(entry, status);
+}
+
+function headerStatus(status: string, live: boolean): string {
+  const running = live ? liveStatusLabel(status) : undefined;
+  return running ?? statusLabel(status);
 }
 
 function liveStatusLabel(value: string): string | undefined {
