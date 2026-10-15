@@ -44,6 +44,9 @@ type TracePublisher = Callable[[RunTrace], None]
 
 _MAX_STEP_DELAY: Final[float] = 10.0
 _MAX_PORT: Final[int] = 65535
+_SKIPPABLE_QUERY_ERRORS: Final[frozenset[RPCStatusCode]] = frozenset(
+    {RPCStatusCode.NOT_FOUND, RPCStatusCode.CANCELLED, RPCStatusCode.DEADLINE_EXCEEDED}
+)
 _STORIES: Final[dict[ScenarioName, str]] = {
     ScenarioName.BUSINESS_FAILURE: "delivery fails after payment, so earlier steps are undone",
     ScenarioName.HAPPY_PATH: "every step works",
@@ -142,8 +145,9 @@ async def _current_state(
     try:
         return await handle.query(AgenticSagaWorkflow.state)
     except RPCError as error:
-        # The workflow (or its namespace) does not exist yet. The run task reports real failures.
-        if error.status is RPCStatusCode.NOT_FOUND:
+        # Not started yet, or a busy server timed this one poll out. The next poll tries again,
+        # and the run task itself reports any real failure.
+        if error.status in _SKIPPABLE_QUERY_ERRORS:
             return None
         raise
 

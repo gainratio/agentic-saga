@@ -145,9 +145,19 @@ class _Handle:
 
 
 @pytest.mark.asyncio
-async def test_state_query_treats_a_not_yet_started_workflow_as_no_state() -> None:
-    # Given
-    handle = _Handle(RPCError("workflow not found", RPCStatusCode.NOT_FOUND, b""))
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [
+        (RPCStatusCode.NOT_FOUND, "workflow not found"),
+        (RPCStatusCode.CANCELLED, "Timeout expired"),
+        (RPCStatusCode.DEADLINE_EXCEEDED, "query deadline exceeded"),
+    ],
+)
+async def test_state_query_skips_a_poll_that_has_no_state_yet(
+    status: RPCStatusCode, message: str
+) -> None:
+    # Given: the workflow is not started yet, or a busy server timed the query out
+    handle = _Handle(RPCError(message, status, b""))
 
     # When
     state = await live._current_state(cast(Any, handle))

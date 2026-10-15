@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import selectors
 import signal
 import subprocess
 import sys
@@ -10,6 +9,9 @@ import time
 import urllib.request
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
+from queue import Empty, Queue
+from threading import Thread
+from typing import IO
 
 import pytest
 import pytest_asyncio
@@ -61,19 +63,13 @@ async def test_follow_run_publishes_unfinished_steps_before_the_final_outcome(
     assert sizes == sorted(sizes)
 
 
-def _read_line(process: subprocess.Popen[str], deadline: float) -> str:
-    assert process.stdout is not None
-    with selectors.DefaultSelector() as selector:
-        selector.register(process.stdout, selectors.EVENT_READ)
-        if not selector.select(timeout=max(0.0, deadline - time.monotonic())):
-            raise AssertionError("demo command produced no output before the deadline")
-    return process.stdout.readline()
-
-
-def _wait_for(process: subprocess.Popen[str], marker: str, seen: list[str]) -> str:
+def _wait_for(lines: Queue[str], marker: str, seen: list[str]) -> str:
     deadline = time.monotonic() + _DEADLINE_SECONDS
-    while time.monotonic() < deadline:
-        line = _read_line(process, deadline)
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            line = lines.get(timeout=remaining)
+        except Empty:
+            break
         if not line:
             raise AssertionError(f"demo command exited early:\n{''.join(seen)}")
         seen.append(line)
@@ -82,8 +78,15 @@ def _wait_for(process: subprocess.Popen[str], marker: str, seen: list[str]) -> s
     raise AssertionError(f"missing {marker!r}:\n{''.join(seen)}")
 
 
+def _pump(stream: IO[str], lines: Queue[str]) -> None:
+    """Read the demo's output on a thread, so buffered lines are never stuck behind a select."""
+    for line in stream:
+        lines.put(line)
+    lines.put("")
+
+
 @contextmanager
-def _demo_command(address: str) -> Iterator[subprocess.Popen[str]]:
+def _demo_command(address: str) -> Iterator[tuple[subprocess.Popen[str], Queue[str]]]:
     command = [sys.executable, "-m", "examples.ecommerce.live", "--no-open"]
     arguments = ["--temporal-address", address, "--step-delay", "0"]
     process = subprocess.Popen(
@@ -93,14 +96,18 @@ def _demo_command(address: str) -> Iterator[subprocess.Popen[str]]:
         text=True,
         env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )
+    lines: Queue[str] = Queue()
+    assert process.stdout is not None
+    reader = Thread(target=_pump, args=(process.stdout, lines), daemon=True)
+    reader.start()
     try:
-        yield process
+        yield process, lines
     finally:
         if process.poll() is None:
             process.kill()
         process.wait(timeout=10)
-        if process.stdout is not None:
-            process.stdout.close()
+        reader.join(timeout=10)
+        process.stdout.close()
 
 
 def _get(url: str) -> bytes:
@@ -116,10 +123,10 @@ async def test_demo_command_serves_the_live_run_in_the_recorder(
     address = environment.client.service_client.config.target_host
     seen: list[str] = []
 
-    with _demo_command(address) as process:
+    with _demo_command(address) as (process, lines):
         # When
-        url = _wait_for(process, "Recorder:", seen).split("Recorder:", 1)[1].split()[0]
-        _wait_for(process, "Live run finished", seen)
+        url = _wait_for(lines, "Recorder:", seen).split("Recorder:", 1)[1].split()[0]
+        _wait_for(lines, "Live run finished", seen)
         index = json.loads(_get(f"{url}/traces/index.json"))
         trace_ref = index["runs"][0]["trace_ref"]
         trace = RunTrace.model_validate_json(_get(f"{url}/traces/{trace_ref}"))
