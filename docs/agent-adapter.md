@@ -11,20 +11,12 @@ undo (compensation), final proof, and the hand-off to a person.
 The model never receives compensation or human-escalation controls. It sees `finish_saga` only
 after the workflow has fresh proof for `succeeded_verified`.
 
-```text
-bounded public observation + eligible business schemas
-                         |
-                         v
-   Jev via OpenRouter (default) / Jev direct / Pydantic AI
-                         |
-                         v
-             typed, sequence-bound proposal
-                         |
-                         v
-      deterministic Temporal workflow -> Activity -> provider
-                         |
-                         v
-       reconciled evidence, compensation, or verified finish
+```mermaid
+flowchart TD
+    O["bounded public observation + eligible business schemas"] --> M["Jev via OpenRouter (default) / Jev direct / Pydantic AI"]
+    M --> P["typed, sequence-bound proposal"]
+    P --> W["deterministic Temporal workflow -> Activity -> provider"]
+    W --> R["reconciled evidence, compensation, or verified finish"]
 ```
 
 This split is deliberate. A model-quality evaluation measures whether the model selected the right

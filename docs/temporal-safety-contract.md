@@ -42,12 +42,12 @@ credential, idempotency key, or human authorization token.
 
 ## State machine
 
-```text
-forward work
-  -> succeeded_verified                         when final proof succeeds
-  -> compensation in reverse dependency order  when the goal becomes unreachable
-      -> compensated_verified                   when every journaled undo has a confirmed outcome
-      -> human_required                         when an undo remains unresolved
+```mermaid
+flowchart TD
+    F["forward work"] -->|"when final proof succeeds"| S["succeeded_verified"]
+    F -->|"when the goal becomes unreachable"| C["compensation in reverse dependency order"]
+    C -->|"when every journaled undo has a confirmed outcome"| CV["compensated_verified"]
+    C -->|"when an undo remains unresolved"| H["human_required"]
 ```
 
 A confirmed outcome is a provider receipt, a reconciliation that confirms the undo, or a verified

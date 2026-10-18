@@ -161,6 +161,23 @@ service adapter must do (a stable request ID, and a way to look up a lost reply)
 
 ## How it works
 
+```mermaid
+flowchart LR
+    A["Agent proposes one<br/>allowed step"] --> B["Fixed rules check it<br/>(Temporal Workflow)"]
+    B --> C["Step runs against<br/>the outside service"]
+    C --> D["Proven done, or undone<br/>newest-first"]
+    B -.->|"rejects anything<br/>not allowed"| A
+
+    classDef purple fill:#f0e8f8,stroke:#9a7ab8,color:#171717
+    classDef blue fill:#e8f4f8,stroke:#7aa7b8,color:#171717
+    classDef orange fill:#f8f0e8,stroke:#b8987a,color:#171717
+    classDef green fill:#e8f8e8,stroke:#7ab87a,color:#171717
+    class A purple
+    class B blue
+    class C orange
+    class D green
+```
+
 Your code registers each step as a typed Python function, and pairs every step that changes
 something with the step that undoes it (charge with refund, reserve with release). On each turn the
 agent sees the goal, the current facts, and only the steps allowed right now, and proposes one.
@@ -171,7 +188,7 @@ reverse order, and a person is asked only when the undo itself cannot be proven.
 
 ### Who decides the next step
 
-The default decision engine for real use is Jev, a model that only picks the next step. Your app
+The default decision engine for real use is Jev (a compact structured-decision model from TypeSafe AI), a model that only picks the next step. Your app
 lists the steps allowed right now, and Jev chooses one and says how sure it is. It never writes
 arguments and never decides how to undo; the workflow does that. Jev runs inside the
 `agentic_saga.decide` Temporal Activity, so its answer is recorded and a replay reads the recorded

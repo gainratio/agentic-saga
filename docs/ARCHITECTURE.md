@@ -65,20 +65,14 @@ The agent chooses; it is not in charge of the transaction. The model does not re
 functions. On each turn it sees a small, typed set of eligible tools. Temporal then validates and
 executes the proposal using deterministic rules.
 
-```text
-public goal + current evidence + eligible tools
-                       |
-                       v
-              bounded agent decision
-                       |
-                       v
-        deterministic Temporal Workflow validates
-              /                    \
-     business Activity       reject invalid proposal
-              |
-      outcome record or reconciliation
-              |
-      prove success, continue, or compensate
+```mermaid
+flowchart TD
+    G["public goal + current evidence + eligible tools"] --> D["bounded agent decision"]
+    D --> W["deterministic Temporal Workflow validates"]
+    W -->|valid| A["business Activity"]
+    W -->|invalid| R["reject invalid proposal"]
+    A --> O["outcome record or reconciliation"]
+    O --> P["prove success, continue, or compensate"]
 ```
 
 No probability model or Markov decision process is required. The LLM only needs to choose a tool
@@ -89,16 +83,11 @@ testable code.
 
 The example is one application of the generic library, not a workflow baked into Agentic Saga.
 
-```text
-reserve inventory -> charge payment -> schedule fulfillment -> verify order
-                                                              |
-                              +-------------------------------+------------------+
-                              |                                                  |
-                       verified success                                   proof fails
-                              |                                                  |
-                   SUCCEEDED_VERIFIED                          cancel -> refund -> release
-                                                                                 |
-                                                                    COMPENSATED_VERIFIED
+```mermaid
+flowchart LR
+    R["reserve inventory"] --> C["charge payment"] --> S["schedule fulfillment"] --> V["verify order"]
+    V -->|"verified success"| OK["SUCCEEDED_VERIFIED"]
+    V -->|"proof fails"| U["cancel -> refund -> release"] --> COMP["COMPENSATED_VERIFIED"]
 ```
 
 The agent chooses among forward tools. It never chooses rollback order. The Workflow derives that
