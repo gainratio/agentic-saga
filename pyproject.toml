@@ -7,7 +7,7 @@ name = "agentic-saga"
 dynamic = ["version"]
 description = "A Python library that lets an AI agent run multi-step jobs like a checkout, and undoes finished steps if one fails."
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 keywords = ["agents", "saga-pattern", "distributed-transactions", "orchestration", "llm"]
