@@ -271,7 +271,8 @@ OpenRouter (a paid AI-model service), using your key. Nothing else is sent.
 
 - **Checked:** every agent proposal is re-checked by the Workflow against the currently allowed
   tools, prerequisites, per-tool call limits, and global budgets. Success requires fresh proof from
-  an authoritative read. A human decision is accepted only after your application's verification
+  an authoritative read for every step marked `proof_for_success`; an effect with no proof read is
+  trusted on its own successful call. A human decision is accepted only after your application's verification
   Activity authenticates its opaque authorization reference and it matches the current event and
   operation.
 - **Refuses rather than warns:** a proposal outside the allowed set is rejected; a lost response is

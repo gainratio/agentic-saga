@@ -6,6 +6,16 @@ All notable changes to Agentic Saga are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The claimed success guarantee is now described accurately.** `proof_for_success` defaults to
+  `False`, so an effect with no declared proof read can finish as `SUCCEEDED_VERIFIED` on its own
+  successful call. The README and architecture now say the fresh-check guarantee applies to steps
+  that declare `proof_for_success`, rather than implying every saga always proves its result.
+- **`THIRD_PARTY_NOTICES.md` names the pinned optional dependencies again:** pydantic-ai-slim
+  2.54.0, typesafe-sdk 0.7.2, openrouter 1.3.35 (the notice lagged at 2.45.0 / 0.7.0 / 1.2.1 while
+  those files ship in every wheel and sdist).
+
 ### Added
 
 - `uv run poe demo`: one command that starts a throwaway local Temporal server, runs a checkout

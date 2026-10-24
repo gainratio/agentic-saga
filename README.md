@@ -182,9 +182,11 @@ Your code registers each step as a typed Python function, and pairs every step t
 something with the step that undoes it (charge with refund, reserve with release). On each turn the
 agent sees the goal, the current facts, and only the steps allowed right now, and proposes one.
 A Temporal Workflow checks the proposal against those rules and limits, runs the step, and records
-the result. If a reply is lost, it asks the provider what happened before doing anything else. The
-job only counts as done after a fresh check proves it; otherwise every finished step is undone in
-reverse order, and a person is asked only when the undo itself cannot be proven.
+the result. If a reply is lost, it asks the provider what happened before doing anything else. A
+step marked `proof_for_success=True` must be followed by a fresh authoritative read before the job
+can finish; otherwise every finished step is undone in reverse order, and a person is asked only
+when the undo itself cannot be proven. Proof is explicit: an effect with no proof read is treated
+as done when its own call succeeds.
 
 ### Who decides the next step
 

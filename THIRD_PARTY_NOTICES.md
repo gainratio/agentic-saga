@@ -5,16 +5,16 @@ They are distributed under the MIT License. Development-only dependencies are no
 Flight Recorder and are not listed here.
 
 The optional Python agent integration installs, but does not bundle, exactly pinned
-`pydantic-ai-slim[openrouter]==2.45.0`, an MIT-licensed upstream project. Agentic Saga uses its
+`pydantic-ai-slim[openrouter]==2.54.0`, an MIT-licensed upstream project. Agentic Saga uses its
 typed model/tool protocol for deferred proposals only; no deep-agent framework is installed.
 
 The optional TypeSafe AI Jev integration installs, but does not bundle,
-`typesafe-sdk==0.7.0`, an MIT-licensed upstream project. Agentic Saga uses its asynchronous System
+`typesafe-sdk==0.7.2`, an MIT-licensed upstream project. Agentic Saga uses its asynchronous System
 One Choice API only; the SDK receives the full public observation, eligible descriptors, and
 complete candidate criteria, proposal arguments, and rationale. It never receives a registered
 business callable or authority to execute an effect.
 
-The optional OpenRouter Decisions transport installs, but does not bundle, `openrouter==1.2.1`, an
+The optional OpenRouter Decisions transport installs, but does not bundle, `openrouter==1.3.35`, an
 Apache-2.0-licensed upstream project whose installed distribution includes its license. It sends
 the same public Jev decision payload to OpenRouter's native Decisions API with zero SDK retries and
 provider-routing preferences that require ZDR and deny data collection; it never falls back to chat
