@@ -120,7 +120,7 @@ class AgenticSagaWorkflow:
         event = WorkflowEvent(
             seq=1,
             kind="started",
-            details={"goal_id": saga.goal.goal_id},
+            details={"goal_id": saga.goal.goal_id, "terminal_proof_required": saga.require_terminal_proof},
             recorded_at=workflow.now(),
             before_status=SagaStatus.RUNNING,
             after_status=SagaStatus.RUNNING,
@@ -541,8 +541,11 @@ class AgenticSagaWorkflow:
         return frozenset(tool.name for tool in self._saga().tools if tool.proof_for_success)
 
     def _terminal_ready(self) -> bool:
+        proofs = self._proof_requirements()
+        if self._saga().require_terminal_proof and not proofs:
+            return False
         tools_ready = self._success_requirements().issubset(self._successful_tools)
-        proofs_fresh = self._proof_requirements().issubset(self._fresh_proofs)
+        proofs_fresh = proofs.issubset(self._fresh_proofs)
         return tools_ready and proofs_fresh
 
     def _required_tool(self, name: str) -> WorkflowTool:

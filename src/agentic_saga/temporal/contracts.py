@@ -365,6 +365,10 @@ class SagaWorkflowInput(_Contract):
     tools: tuple[WorkflowTool, ...] = Field(min_length=1, max_length=100)
     max_agent_turns: int = Field(strict=True, ge=1, le=100)
     max_tool_calls: int = Field(strict=True, ge=1, le=100)
+    # Fail closed: a saga must declare at least one proof tool before it can
+    # reach succeeded_verified. A manifest that genuinely cannot prove success
+    # opts out explicitly, and the start event records that choice.
+    require_terminal_proof: bool = True
 
     @model_validator(mode="after")
     def require_unique_tools(self) -> Self:
