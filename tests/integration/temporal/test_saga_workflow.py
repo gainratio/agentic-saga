@@ -162,7 +162,11 @@ def _read(
     )
 
 
-def _input(*tools: WorkflowTool, max_tool_calls: int = 10) -> SagaWorkflowInput:
+def _input(
+    *tools: WorkflowTool,
+    max_tool_calls: int = 10,
+    require_proof: bool = False,
+) -> SagaWorkflowInput:
     suffix = next(_IDS)
     return SagaWorkflowInput(
         saga_id=f"saga_{suffix:016d}",
@@ -170,6 +174,8 @@ def _input(*tools: WorkflowTool, max_tool_calls: int = 10) -> SagaWorkflowInput:
         tools=tools,
         max_agent_turns=10,
         max_tool_calls=max_tool_calls,
+        # Most scenarios model effects without a proof read; opt out explicitly.
+        require_terminal_proof=require_proof,
     )
 
 
@@ -483,6 +489,25 @@ async def test_agent_turn_exhaustion_unwinds_confirmed_effect(
 
     assert result.status is SagaStatus.COMPENSATED_VERIFIED
     assert [call.tool_name() for call in activities.calls] == ["reserve", "release"]
+
+
+async def test_default_policy_blocks_an_unproven_success(
+    temporal_environment: WorkflowEnvironment,
+) -> None:
+    activities = ScenarioActivities(
+        decisions=deque(("reserve", "finish")),
+        outcomes={
+            "reserve": ToolActivityResult.succeeded({"reservation": "r1"}),
+            "release": ToolActivityResult.succeeded({"released": True}),
+        },
+    )
+    workflow_input = _input(_effect("reserve", "release"), require_proof=True)
+
+    async with _running(temporal_environment, activities, workflow_input) as handle:
+        result = await handle.result()
+
+    assert result.status is not SagaStatus.SUCCEEDED_VERIFIED
+    assert any(event.details.get("reason_code") == "terminal_proof_missing" for event in result.events)
 
 
 async def test_read_or_proof_tool_creates_no_compensation_obligation(

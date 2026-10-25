@@ -11,6 +11,11 @@ undo (compensation), final proof, and the hand-off to a person.
 The model never receives compensation or human-escalation controls. It sees `finish_saga` only
 after the workflow has fresh proof for `succeeded_verified`.
 
+**Proof is required by default.** A manifest with no `proof_for_success` tool cannot reach
+`succeeded_verified`; the workflow stops with `terminal_proof_missing`. A manifest that genuinely
+cannot prove success opts out explicitly with `require_terminal_proof: false`, and the `started`
+event records `terminal_proof_required: false` so the choice is visible in the trace.
+
 ```mermaid
 flowchart TD
     O["bounded public observation + eligible business schemas"] --> M["Jev via OpenRouter (default) / Jev direct / Pydantic AI"]

@@ -160,6 +160,9 @@ class SagaManifest(_ManifestModel):
     tools: _Tools
     checks: _Checks
     escalation: _Escalation
+    # Default true: succeeded_verified needs a fresh proof tool. A manifest that
+    # cannot prove success opts out explicitly; the start event records it.
+    require_terminal_proof: bool = True
     example_paths: Annotated[
         tuple[_ExamplePath, ...], BeforeValidator(_tuple_from_yaml), Field(max_length=20)
     ] = ()
