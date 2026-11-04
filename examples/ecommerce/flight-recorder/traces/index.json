@@ -8,7 +8,7 @@
       "mode": "scripted",
       "presentation": "ecommerce",
       "trace_ref": "happy-path.json",
-      "trace_sha256": "8b7bbe895122d8bba456b394a471b0ee95d51eb25050cea6d3c6b56ebb7431f0"
+      "trace_sha256": "4f5fb98c55c853ec95cc2540d6361bef1734047a4c4af5e382ec6a1f984acfe8"
     },
     {
       "id": "lost-response",
@@ -17,7 +17,7 @@
       "mode": "scripted",
       "presentation": "ecommerce",
       "trace_ref": "lost-response.json",
-      "trace_sha256": "b0ab1e310c834a1b6ee897d4d1e0de3803f94be531a2c2be517acf6be2a6c8fa"
+      "trace_sha256": "a55aa617a1a9f5f2fe9dd5dbc7f8e50d2c50e295ae4643b9f6a90c963737da6f"
     },
     {
       "id": "business-failure",
@@ -26,7 +26,7 @@
       "mode": "scripted",
       "presentation": "ecommerce",
       "trace_ref": "business-failure.json",
-      "trace_sha256": "e9a360b3ccf7aed5010e5a2470292621be67655a80ea353318c8657556b12749"
+      "trace_sha256": "b63d0087af692207e880646681e82c69d01010180a920b81613d72ff04b46086"
     },
     {
       "id": "compensation-failure",
@@ -35,7 +35,7 @@
       "mode": "scripted",
       "presentation": "ecommerce",
       "trace_ref": "compensation-failure.json",
-      "trace_sha256": "a85afcef54a5303eddfec50b5e267ba7086b3bae514fe0730facd277638ce4af"
+      "trace_sha256": "96166822db5e29110e8139a96a7d02d61da1f9097a3cfe6cb2e71ae08f2b8cf3"
     }
   ]
 }
