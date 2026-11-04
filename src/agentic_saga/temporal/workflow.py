@@ -120,7 +120,10 @@ class AgenticSagaWorkflow:
         event = WorkflowEvent(
             seq=1,
             kind="started",
-            details={"goal_id": saga.goal.goal_id, "terminal_proof_required": saga.require_terminal_proof},
+            details={
+                "goal_id": saga.goal.goal_id,
+                "terminal_proof_required": saga.require_terminal_proof,
+            },
             recorded_at=workflow.now(),
             before_status=SagaStatus.RUNNING,
             after_status=SagaStatus.RUNNING,

@@ -507,7 +507,9 @@ async def test_default_policy_blocks_an_unproven_success(
         result = await handle.result()
 
     assert result.status is not SagaStatus.SUCCEEDED_VERIFIED
-    assert any(event.details.get("reason_code") == "terminal_proof_missing" for event in result.events)
+    assert any(
+        event.details.get("reason_code") == "terminal_proof_missing" for event in result.events
+    )
 
 
 async def test_read_or_proof_tool_creates_no_compensation_obligation(
