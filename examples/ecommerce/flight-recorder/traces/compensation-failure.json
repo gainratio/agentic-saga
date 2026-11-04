@@ -29,7 +29,8 @@
       "redacted_input": null,
       "redacted_output": null,
       "rationale": {
-        "goal_id": "checkout_order"
+        "goal_id": "checkout_order",
+        "terminal_proof_required": true
       },
       "policy_decision": null,
       "receipt": null,
