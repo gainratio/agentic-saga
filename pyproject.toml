@@ -10,7 +10,16 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
-keywords = ["agents", "saga-pattern", "distributed-transactions", "orchestration", "llm"]
+keywords = [
+  "agents",
+  "ai-agents",
+  "compensation",
+  "distributed-transactions",
+  "llm",
+  "orchestration",
+  "saga-pattern",
+  "temporal",
+]
 authors = [{ name = "Harish Seshadri" }]
 classifiers = [
   "Development Status :: 4 - Beta",

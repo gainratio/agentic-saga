@@ -6,6 +6,12 @@ All notable changes to Agentic Saga are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `CLAUDE.md` canonical engineering instructions and `## Under the hood (for developers)` source-layout overview in `README.md`.
+
+## [0.1.0] - 2026-11-10
+
 ### Fixed
 
 - **The claimed success guarantee is now described accurately.** `proof_for_success` defaults to
