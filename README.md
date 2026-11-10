@@ -159,6 +159,17 @@ drift from what works. The [integration guide](docs/integration.md) explains eac
 that are easy to miss, how to connect a real Temporal server or Temporal Cloud, and what a real
 service adapter must do (a stable request ID, and a way to look up a lost reply).
 
+---
+
+## Under the hood (for developers)
+
+For developers reading the source tree or wiring a real service adapter:
+
+- [`src/agentic_saga/`](src/agentic_saga/): core Temporal Workflow, typed Activities, step registry, `saga.yaml` manifest parser, and optional agent adapters (`OpenRouterDecisions`, `Jev`, `PydanticAIDriver`, and scripted drivers).
+- [`examples/`](examples/ecommerce/README.md): minimal [`trip.py`](examples/quickstart/trip.py) walkthrough and the four-scenario ecommerce Flight Recorder demo.
+- [`web/flight-recorder/`](docs/flight-recorder.md): React trace viewer served by `uv run poe demo`.
+- [`.env.example`](.env.example): optional model keys (`OPENROUTER_API_KEY`, `TYPESAFE_API_KEY`) and Temporal connection settings (`cp .env.example .env`).
+
 ## How it works
 
 ```mermaid
