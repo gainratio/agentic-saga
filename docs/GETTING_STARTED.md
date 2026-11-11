@@ -70,15 +70,19 @@ It also prints a harmless `WARN ... Temporal Server 1.16.0 or newer` line. Read
 [examples/quickstart/trip.py](../examples/quickstart/trip.py) top to bottom: it is the whole API in
 one file.
 
-The browser demo runs the checkout saga on a throwaway Temporal server and shows each step live:
+The browser demo triages a customer's stuck-order concern (or politely declines non-order prompts)
+and shows each step live on a throwaway Temporal server:
 
 ```bash
 uv run poe demo                 # opens your browser; add --no-open to skip that
+uv run poe demo not-an-order    # polite decline: 0 workflows started, 0 tool calls
 uv run poe demo happy-path      # other scenarios: lost-response, compensation-failure
+uv run poe demo-checkout        # classic 4-scenario checkout demo
 ```
 
-It printed `Live run finished: compensated_verified. Press Ctrl+C to stop the page.` after 11
-seconds. Press Ctrl+C to stop it. The full example is described in
+`uv run poe demo` prints `Live run finished: compensated_verified. Press Ctrl+C to stop the page.`
+after ~11 seconds. Press Ctrl+C to stop it. See
+[examples/order_concern/README.md](../examples/order_concern/README.md) and
 [examples/ecommerce/README.md](../examples/ecommerce/README.md).
 
 ## 4. Map of the code

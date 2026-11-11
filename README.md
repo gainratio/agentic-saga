@@ -1,32 +1,41 @@
 # Agentic Saga
 
-A Python library that lets an AI agent run multi-step jobs like a checkout, and undoes finished steps if one fails.
+Turn a customer's messy order concern into a safe multi-step fix on Temporal, with automatic undo if a step fails.
 
 **Try it:** `git clone https://github.com/gainratio/agentic-saga && cd agentic-saga && uv run poe demo` opens a live run in your browser. No API key.
 
-A checkout touches several outside services: reserve the stock, charge the card, book the
-delivery. If the delivery company says no after the card was charged, someone has to refund the
-card and release the stock, in that order, exactly once. Doing that by hand in code is fiddly.
-Letting an AI agent do it is worse: you do not want a language model deciding when to refund or
-whether a lost response means "paid" or "not paid".
+Suppose a customer writes: *"I paid $79 four days ago for `order_8841` and still haven't received
+it — please rush a replacement or refund me."* Resolving that touches inventory, billing, courier
+booking, and depot tracking. If the depot check reveals the original parcel was just scanned onto a
+delivery truck after you booked an express courier and issued a $15 courtesy credit, every finished
+step has to be undone newest-first so you never ship twice or leave money out of sync. A language
+model is great at reading the customer's message, and terrible at inventing rollback logic or
+guessing whether a lost reply succeeded.
 
-Agentic Saga splits the job. The agent only picks the next step from a short list of steps that
-are allowed right now. Ordinary Python rules, run by [Temporal](https://temporal.io) (an
-open-source service that records every step, so a crash does not lose work), check that choice,
-run the step, and undo the finished steps newest-first if the job cannot be proven done. If even
-the undo cannot be proven, it stops and waits for a person.
+Agentic Saga combines four layers so each part only does what it is good at:
+
+1. **Agent + LLM intake (`start_concern_saga`)** reads the customer's free-form prompt — and if the
+   prompt is **not** an order processing issue, politely replies so with zero workflows started and
+   zero tool calls.
+2. **Constrained step decision engine (`Jev` / `PydanticAI`)** sees only the steps allowed right now
+   and proposes one forward step at a time.
+3. **Durable workflow state ([Temporal](https://temporal.io))** checks rules and budgets, reconciles
+   lost replies before retrying, checks proof, runs automatic newest-first compensating transactions
+   when proof fails, and pauses for a person if an undo reply is uncertain.
+4. **Deterministic paired tools (`ToolRegistry`)** validate strict Pydantic inputs and pair every
+   forward change with its exact undo tool.
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Use it in your app](docs/integration.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Agent adapters](docs/agent-adapter.md) · [Safety rules](docs/temporal-safety-contract.md) · [Operations](docs/operations.md)
 
-![The live demo page: "What if an AI agent's order fails halfway?" Steps reserve the item, charge the card and book the delivery turn Done; the final check fails; a caption explains the delivery company turned the order down; the delivery is cancelled, the card refunded and the item released; the result says nothing was left half-done](docs/assets/live-demo.gif)
+![The live Flight Recorder page: "I paid $79 and never got my order — can an AI fix it safely?" Hold a replacement item, add a $15 courtesy credit, and book an express courier turn Done; the depot check finds the original parcel on a truck; the express courier is cancelled, the $15 credit removed, and the replacement item put back](docs/assets/live-demo.gif)
 
 **[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-saga/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
 
 ## Try it
 
 You need [uv](https://docs.astral.sh/uv/), git, and an internet connection for the first run. uv
-installs a matching Python and the dependencies if you don't have them. Nothing else to install, and no
-account or API key.
+installs a matching Python and the dependencies if you don't have them. Nothing else to install, and
+no account or API key.
 
 ```bash
 git clone https://github.com/gainratio/agentic-saga.git
@@ -34,51 +43,65 @@ cd agentic-saga
 uv run poe demo
 ```
 
-The command starts a throwaway Temporal server on your machine (the first run downloads Python,
-the dependencies, and Temporal: under a minute on a fast connection), runs one checkout on it, and
-opens the page above. If no browser can open, it prints the page's address instead. The page
-explains itself in plain words, so you can show it to someone who doesn't write code. Each step
-takes about a second and a half so you can follow it:
+The command checks the customer prompt first, starts a throwaway Temporal server on your machine
+(the first run downloads Python, dependencies, and Temporal in under a minute), runs the
+order-concern saga, and opens the Flight Recorder page above. Each step takes about a second and a
+half so you can watch it happen:
 
-1. The agent reserves the item, charges the card, and books the delivery.
-2. The final check fails: the delivery company turned the order down.
-3. The earlier steps are undone, newest first: cancel the delivery, refund the card, release the
-   item. A caption says what is happening and why.
-4. The page ends with a plain summary: nothing was left half-done.
+1. Intake accepts the customer's paid-not-delivered message for `order_8841`.
+2. The step chooser holds a replacement item, applies a $15 courtesy credit, and books an express
+   courier.
+3. The depot check (`verify_original_stopped`) finds the original parcel was just scanned onto a
+   delivery truck.
+4. Temporal undoes every finished step newest-first: cancel the express courier, reverse the $15
+   credit, and release the replacement item.
 
-The agent in this demo is a fixed script and the shop is simulated, so no money moves and no AI
-model is called. The page says so. Developers can open **Technical details for developers** for
-the full record of every step. Your terminal shows the same run (a real run, shortened; port
-numbers change each time; Temporal also prints a few lines of its own, including a harmless
-`WARN ... Cluster Id` line):
+Your terminal shows the live run (port numbers vary; Temporal also prints a harmless `WARN ...
+Cluster Id` line):
 
 ```text
-Agentic Saga live demo: business-failure (delivery fails after payment, so earlier steps are undone).
-Mode: scripted agent, simulated shop services, no API key, no model calls.
+Agentic Saga live demo: already-in-transit (original parcel is scanned onto the truck after courier booking, so earlier steps undo).
+Customer prompt: "I paid $79 four days ago for order_8841 and still haven't received it — please rush a replacement or refund me."
+Layers: 1) Intake accepted order concern -> 2) Constrained step engine -> 3) Temporal workflow state -> 4) Paired deterministic tools.
 Temporal: starting a throwaway local server (the first run downloads it once)…
-Recorder: http://127.0.0.1:62969  (this page updates every second)
   …
-  09 invariant_evaluated verify_order -> running
+  09 invariant_evaluated verify_original_stopped -> running
   10 compensation_started -> compensating
-  11 compensation_outcome_recorded cancel_fulfillment -> compensating
-  …
+  11 compensation_outcome_recorded cancel_express_courier -> compensating
+  12 compensation_outcome_recorded reverse_shipping_credit -> compensating
+  13 compensation_outcome_recorded release_replacement -> compensating
+  14 compensation_completed -> compensating
   15 terminal_assigned -> compensated_verified
+Recorder: http://127.0.0.1:51946  (this page updates every second)
 Live run finished: compensated_verified. Press Ctrl+C to stop the page.
 ```
 
-The page stays open after the run. Press Ctrl+C to stop. Three other runs show the other cases:
+Now try an unrelated prompt — intake politely declines before starting Temporal or calling any tool:
 
 ```bash
-uv run poe demo happy-path            # every step works
-uv run poe demo lost-response         # the card company's reply is lost; it asks, not charges again
-uv run poe demo compensation-failure  # the refund can't be confirmed, so a person must sign off
+uv run poe demo not-an-order
+# or pass any custom prompt:
+uv run poe demo --prompt "What is the weather in Seattle this weekend?"
 ```
 
-In `compensation-failure` the demo plays the person and signs off for them, so the undo can finish.
+```text
+Agentic Saga live demo: customer concern intake.
+Customer prompt: "What is the weather in Seattle this weekend?"
+Agent reply: "That doesn't look like an order processing issue. I can help when an order you paid for hasn't arrived or needs a replacement or refund — no order changes were started."
+Outcome: polite_decline (not an order processing issue; 0 workflows started, 0 tools).
+```
+
+Three other runs show the remaining saga outcomes (and `uv run poe demo-checkout` runs the classic
+checkout demo):
+
+```bash
+uv run poe demo happy-path            # original parcel stopped at depot; express replacement ships
+uv run poe demo lost-response         # billing reply is lost; reconciled instead of crediting twice
+uv run poe demo compensation-failure  # credit reversal reply is lost; pauses for a support lead
+```
 
 Add `--step-delay 0` to run at full speed, or `--temporal-address localhost:7233` to use a
-Temporal server you already started with `temporal server start-dev`. You can see that server's
-own view of the run in its web UI at `localhost:8233`.
+Temporal server you already started with `temporal server start-dev`.
 
 ## Use it in your own code
 
@@ -88,9 +111,11 @@ Install it from GitHub (it is not on PyPI yet):
 uv add "agentic-saga @ git+https://github.com/gainratio/agentic-saga"
 ```
 
-The smallest complete program is [`examples/quickstart/trip.py`](examples/quickstart/trip.py). It
-books a flight and a hotel, then a final check fails, and the saga cancels both. Here are its key
-parts. First, register each step that changes something, and name the step that undoes it:
+The smallest complete program is [`examples/quickstart/trip.py`](examples/quickstart/trip.py) (for
+the full 4-layer customer intake + saga example, see
+[`examples/order_concern/`](examples/order_concern/README.md)). `trip.py` books a flight and a
+hotel, fails the final check, and cancels both. First, register each step that changes something,
+and name the step that undoes it:
 
 ```python
 def build_registry(forward: list[str], undo: list[str]) -> ToolRegistry:
@@ -123,9 +148,10 @@ WORKFLOW_TOOLS = (
 )
 ```
 
-Finally, start a worker and the saga, and wait for the result. Here the agent is a script. To use
-a model instead, build a driver from the [agent adapter guide](docs/agent-adapter.md) and pass it in
-place of `ScriptedAgent()`; it also needs a function that lists the allowed steps:
+Finally, start a worker and the saga, and wait for the result (or call `start_concern_saga(...)` to
+place LLM intake triage in front of `start_saga(...)`). To use a live model for step decisions,
+build a driver from the [agent adapter guide](docs/agent-adapter.md) and pass it in place of
+`ScriptedAgent()`:
 
 ```python
     activities = TemporalActivities(ScriptedAgent(), build_registry(forward, undo), BUDGET)
@@ -153,22 +179,17 @@ Undo steps:    cancel_hotel -> cancel_flight
 Outcome:       compensated_verified
 ```
 
-Temporal's test server may print one `WARN ... Temporal Server 1.16.0 or newer is required` line
-first. It is harmless.
-
-The code above is cut straight from that file, and a test runs the file, so this section cannot
-drift from what works. The [integration guide](docs/integration.md) explains each part, the rules
-that are easy to miss, how to connect a real Temporal server or Temporal Cloud, and what a real
-service adapter must do (a stable request ID, and a way to look up a lost reply).
+The code above is cut straight from [`examples/quickstart/trip.py`](examples/quickstart/trip.py),
+and a test verifies it cannot drift. The [integration guide](docs/integration.md) explains real
+Temporal / Temporal Cloud setup and durable service adapters.
 
 ---
 
 ## Under the hood (for developers)
 
-For developers reading the source tree or wiring a real service adapter:
-
-- [`src/agentic_saga/`](src/agentic_saga/): core Temporal Workflow, typed Activities, step registry, `saga.yaml` manifest parser, and optional agent adapters (`OpenRouterDecisions`, `Jev`, `PydanticAIDriver`, and scripted drivers).
-- [`examples/`](examples/ecommerce/README.md): minimal [`trip.py`](examples/quickstart/trip.py) walkthrough and the four-scenario ecommerce Flight Recorder demo.
+- [`src/agentic_saga/`](src/agentic_saga/): `triage.py` concern intake (`start_concern_saga`, `ClassifiedConcernTriage`, `build_pydantic_ai_concern_classifier`), Temporal Workflow & Activities, step registry, `saga.yaml` manifest parser, and decision adapters (`OpenRouterDecisions`, `Jev`, `PydanticAIDriver`).
+- [`examples/order_concern/`](examples/order_concern/README.md): the 4-layer paid-not-delivered customer concern demo served by `uv run poe demo`.
+- [`examples/ecommerce/`](examples/ecommerce/README.md) & [`examples/quickstart/`](examples/quickstart/trip.py): classic checkout demo (`uv run poe demo-checkout`) and minimal `trip.py`.
 - [`web/flight-recorder/`](docs/flight-recorder.md): React trace viewer served by `uv run poe demo`.
 - [`.env.example`](.env.example): optional model keys (`OPENROUTER_API_KEY`, `TYPESAFE_API_KEY`) and Temporal connection settings (`cp .env.example .env`).
 
@@ -176,38 +197,40 @@ For developers reading the source tree or wiring a real service adapter:
 
 ```mermaid
 flowchart LR
-    A["Agent proposes one<br/>allowed step"] --> B["Fixed rules check it<br/>(Temporal Workflow)"]
-    B --> C["Step runs against<br/>the outside service"]
-    C --> D["Proven done, or undone<br/>newest-first"]
-    B -.->|"rejects anything<br/>not allowed"| A
+    U["Customer prompt"] --> T["1. Agent / LLM Triage<br/>(start_concern_saga)"]
+    T -.->|"not an order issue:<br/>polite reply, 0 tools"| R["Polite decline"]
+    T -->|"valid order concern"| A["2. Decision Engine<br/>(Jev / PydanticAI)"]
+    A --> B["3. Workflow State<br/>(Temporal)"]
+    B --> C["4. Paired Tools<br/>(forward + undo)"]
+    C --> D["Verified done, or<br/>undone newest-first"]
 
+    classDef gray fill:#f4f4f6,stroke:#8b8d98,color:#171717
     classDef purple fill:#f0e8f8,stroke:#9a7ab8,color:#171717
     classDef blue fill:#e8f4f8,stroke:#7aa7b8,color:#171717
     classDef orange fill:#f8f0e8,stroke:#b8987a,color:#171717
     classDef green fill:#e8f8e8,stroke:#7ab87a,color:#171717
-    class A purple
+    class U,R gray
+    class T,A purple
     class B blue
     class C orange
     class D green
 ```
 
-Your code registers each step as a typed Python function, and pairs every step that changes
-something with the step that undoes it (charge with refund, reserve with release). On each turn the
-agent sees the goal, the current facts, and only the steps allowed right now, and proposes one.
-A Temporal Workflow checks the proposal against those rules and limits, runs the step, and records
-the result. If a reply is lost, it asks the provider what happened before doing anything else. A
-step marked `proof_for_success=True` must be followed by a fresh authoritative read before the job
-can finish; otherwise every finished step is undone in reverse order, and a person is asked only
-when the undo itself cannot be proven. Proof is explicit: an effect with no proof read is treated
-as done when its own call succeeds.
+Your code registers each step as a typed Python function and pairs every forward change with the
+step that undoes it (`reserve_replacement` with `release_replacement`, `issue_shipping_credit` with
+`reverse_shipping_credit`, `book_express_courier` with `cancel_express_courier`). Once intake
+accepts a relevant concern, the decision engine sees only the steps allowed right now and proposes
+one. The Temporal Workflow checks that choice against rules and budgets, runs the tool, reconciles
+any lost reply before retrying, requires a fresh read on `proof_for_success=True`, and undoes
+finished steps newest-first if proof fails.
 
 ### Who decides the next step
 
-The default decision engine for real use is Jev (a compact structured-decision model from TypeSafe AI), a model that only picks the next step. Your app
-lists the steps allowed right now, and Jev chooses one and says how sure it is. It never writes
-arguments and never decides how to undo; the workflow does that. Jev runs inside the
-`agentic_saga.decide` Temporal Activity, so its answer is recorded and a replay reads the recorded
-answer instead of asking again. It needs one key, `OPENROUTER_API_KEY`:
+The default decision engine for real step selection is Jev (a compact structured-decision model from
+TypeSafe AI). Your app lists the currently eligible steps, and Jev picks one and reports confidence
+without writing free-form undo logic. Jev runs inside the `agentic_saga.decide` Temporal Activity so
+replays read recorded history instead of calling the model again. It needs one key,
+`OPENROUTER_API_KEY`:
 
 ```python
 from agentic_saga.agents import OpenRouterDecisionsSettings, build_openrouter_decisions_driver
@@ -218,31 +241,28 @@ driver = build_openrouter_decisions_driver(
 )
 ```
 
-The alternatives are Jev called directly through its maker TypeSafe's own API (`build_jev_driver`
-with `TYPESAFE_API_KEY`), any model that supports tool calling through
-[Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a scripted driver like the one in the
-demo. All four are in the [agent adapter guide](docs/agent-adapter.md), with a full runnable
-example.
+Alternatives are Jev called directly (`build_jev_driver` with `TYPESAFE_API_KEY`), any tool-calling
+model through [Pydantic AI](https://ai.pydantic.dev) and OpenRouter, or a local deterministic driver
+like the one in the zero-key demo. All four are covered in the
+[agent adapter guide](docs/agent-adapter.md).
 
 ### The browser page
 
-The browser page is the Flight Recorder, a small React app bundled with the library. It reads the
-run's record and draws it; it never runs anything itself. `uv run poe demo` serves it while the run
-is still going, with a plain-language view on top and the full developer view folded underneath. `uv run agentic-saga demo --open` serves four recorded runs without Temporal.
+The Flight Recorder is a small React app bundled with the library. `uv run poe demo` updates it live
+every second with a plain-English explanation on top and **Technical details for developers** folded
+underneath. `uv run agentic-saga demo --open` serves pre-recorded runs offline without Temporal.
 
 ## What it does not do
 
-- **It is not released.** Version 0.1.0 is not on PyPI and has no tagged release. Install it from
-  GitHub.
-- **It cannot make an outside service safe to retry.** Your payment or stock service must accept a
-  stable request ID so a repeated call is recognized. The example services are simulations.
+- **It is not released on PyPI yet.** Version 0.1.0 is installed from GitHub.
+- **It cannot make an outside service safe to retry.** Your payment, credit, or stock service must
+  accept a stable request ID so a repeated call is recognized. The example services are simulations.
 - **It needs a Temporal server.** The demo and examples start a throwaway one for you. Real use
   needs your own (`temporal server start-dev` locally) or Temporal Cloud.
-- **It does not judge the AI model.** Tests never call a paid model. How well a live model picks
-  steps is not tested here.
+- **It does not judge the AI model.** Offline tests never call a paid model.
 - **Anything you put in a step's inputs is stored in Temporal.** Use Temporal's payload encryption
-  for private data. With an AI agent on, the goal, the current facts, and the allowed steps are sent
-  to OpenRouter with your key.
+  for private data. With a live model enabled, public context and eligible steps are sent to your
+  configured model service.
 - **Recorded runs are hash-checked, not signed.** Someone who can edit a trace file can rewrite it.
 - Python 3.12 or 3.13 on Linux or macOS only.
 
@@ -251,10 +271,10 @@ is still going, with a plain-language view on top and the full developer view fo
 | If you need | Use |
 | --- | --- |
 | Every change lives in one database | A database transaction |
-| A fixed sequence of steps that rarely changes | Temporal on its own |
-| An agent that only reads or drafts, and nothing it does is hard to undo | An agent framework calling tools directly |
+| A fixed form with no free-form user request and a static sequence of steps | Temporal on its own |
+| An agent that only reads or drafts, and nothing it does needs rollback | An agent framework calling tools directly |
 | A few routes you can write out by hand | Plain `if/else` code |
-| An agent picking steps that change real things, with undo and proof built in | Agentic Saga |
+| Free-form user concerns turned into multi-step changes with deterministic undo and proof | Agentic Saga |
 
 ## Develop
 
@@ -270,6 +290,8 @@ covers prerequisites, timings, a map of the code, and your first change. Then re
 
 ## More detail
 
+- [Order-concern example](examples/order_concern/README.md): the 4-layer customer concern intake,
+  step chooser, Temporal state, and paired tools demo.
 - [Use it in your app](docs/integration.md): the minimal example explained, real Temporal and
   Temporal Cloud, real service adapters, and picking an agent.
 - [Getting started for developers](docs/GETTING_STARTED.md): from a fresh clone to a green local
@@ -286,7 +308,7 @@ covers prerequisites, timings, a map of the code, and your first change. Then re
 - [Flight Recorder](docs/flight-recorder.md): the browser page, live and recorded.
 - [ADR 0001](docs/adr/0001-temporal-runtime.md): why Temporal is the only durability engine.
 - [Quality review, 2026-09-19](docs/NORTHSTAR-REVIEW.md): an internal review and its findings.
-- [Ecommerce example](examples/ecommerce/README.md): the full checkout with all four outcomes.
+- [Ecommerce example](examples/ecommerce/README.md): the classic checkout with all four outcomes.
 - [PROVENANCE.md](PROVENANCE.md): how a release candidate is built and checked.
 - [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and
   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

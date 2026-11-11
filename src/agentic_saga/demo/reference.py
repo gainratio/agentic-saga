@@ -28,6 +28,12 @@ REFERENCE_PRESENTATIONS: Final[dict[str, str]] = {
     "lost-response": "The payment reply is lost",
     "compensation-failure": "The refund needs human verification",
 }
+ORDER_CONCERN_PRESENTATIONS: Final[dict[str, str]] = {
+    "already-in-transit": "Original parcel scanned onto truck",
+    "happy-path": "Express replacement ships safely",
+    "lost-response": "Courtesy credit reply is lost",
+    "compensation-failure": "Credit reversal needs support-lead check",
+}
 DEFAULT_REFERENCE_SCENARIO: Final[ReferenceScenario] = "business-failure"
 _MAX_TRACE_BYTES: Final[int] = 8 * 1024 * 1024
 
@@ -59,6 +65,17 @@ def _recovery_summary(trace: RunTrace) -> str:
             "The order fails. Human verification resolves the uncertain refund; recovery succeeds."
         )
     return "The order fails. Recovery succeeds: payment is refunded and stock is released."
+
+
+def order_concern_summary(trace: RunTrace) -> str:
+    """Describe the recorded order-concern outcome without inferring it from a scenario name."""
+    if trace.outcome.value == "succeeded_verified":
+        return "Express replacement, courtesy credit, and stopped original parcel are verified."
+    if trace.outcome.value == "compensated_verified":
+        return "Original parcel was in transit; courier, credit, and replacement were undone."
+    if trace.outcome.value == "human_required":
+        return "Credit reversal is unresolved and paused for support-lead verification."
+    return "The recording ends before a verified resolution or undo outcome."
 
 
 def load_reference_trace(scenario: str) -> RunTrace:

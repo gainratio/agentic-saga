@@ -27,6 +27,12 @@ const completedTools: Readonly<Record<string, string>> = {
   cancel_fulfillment: "Delivery cancelled",
   refund_payment: "Refund completed",
   release_inventory: "Inventory released",
+  reserve_replacement: "Replacement item reserved",
+  issue_shipping_credit: "Courtesy $15 credit issued",
+  book_express_courier: "Express courier booked",
+  cancel_express_courier: "Express courier cancelled",
+  reverse_shipping_credit: "Courtesy $15 credit reversed",
+  release_replacement: "Replacement item released",
 };
 interface EventResult {
   readonly label: "Recorded" | "Completed" | "Failed" | "Uncertain" | "Verified" | "Needs review";
@@ -142,7 +148,12 @@ function resultFor(event: TraceEvent): EventResult {
 function invariantResult(event: TraceEvent): EventResult {
   const verified =
     event.redacted_output?.verified ?? event.receipt?.verified ?? event.rationale.all_passed;
-  const subject = event.tool_name === "verify_order" ? "Order verification" : "Safety check";
+  const subject =
+    event.tool_name === "verify_order"
+      ? "Order verification"
+      : event.tool_name === "verify_original_stopped"
+        ? "Original shipment check"
+        : "Safety check";
   if (verified === false) return { label: "Failed", detail: `${subject} failed` };
   if (verified === true) return { label: "Verified", detail: `${subject} passed` };
   return { label: "Recorded", detail: "Safety evidence recorded; result not specified" };

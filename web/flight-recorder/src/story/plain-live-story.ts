@@ -1,8 +1,15 @@
 import type { ReplayProjection } from "../replay/project-replay";
+import type { ScenarioIndexEntry } from "../scenarios/schema";
 import type { TraceEvent } from "../trace/schema";
-import { type FlowStep, type FlowStepState, projectEcommerceFlow } from "./project-ecommerce-flow";
+import {
+  type EcommerceFlow,
+  type FlowStep,
+  type FlowStepState,
+  projectEcommerceFlow,
+  projectOrderConcernFlow,
+} from "./project-ecommerce-flow";
 
-/** The checkout told in everyday words, for someone who has never seen the code. */
+/** The live run told in everyday words, for someone who has never seen the code. */
 export interface PlainStory {
   readonly caption: string;
   readonly forward: readonly PlainStep[];
@@ -17,15 +24,24 @@ export interface PlainStep {
   readonly status: string;
 }
 
-const LABELS: Readonly<Record<string, string>> = {
-  "reserve-inventory": "Reserve the item",
-  "charge-payment": "Charge the card",
-  "schedule-fulfillment": "Book the delivery",
-  "verify-order": "Check the order went through",
-  "cancel-fulfillment": "Cancel the delivery",
-  "refund-payment": "Refund the card",
-  "release-inventory": "Release the item",
-};
+interface StoryCopy {
+  readonly project: (projection: ReplayProjection) => EcommerceFlow;
+  readonly proofId: string;
+  readonly chargeTool: string;
+  readonly labels: Readonly<Record<string, string>>;
+  readonly doing: Readonly<Record<string, string>>;
+  readonly done: Readonly<Record<string, string>>;
+  readonly undone: Readonly<Record<string, string>>;
+  readonly undoComplete: Readonly<Record<string, string>>;
+  readonly summary: Readonly<Record<string, string>>;
+  readonly fixedCaptions: Readonly<Record<string, string>>;
+  readonly settledReply: string;
+  readonly lostChargeReply: string;
+  readonly proofPassed: string;
+  readonly proofFailed: string;
+  readonly unknownUndoCaption: string;
+  readonly checkingUndoReply: string;
+}
 
 const STATUS: Readonly<Record<FlowStepState, string>> = {
   active: "Working…",
@@ -37,68 +53,137 @@ const STATUS: Readonly<Record<FlowStepState, string>> = {
   waiting: "Waiting",
 };
 
-const DOING: Readonly<Record<string, string>> = {
-  reserve_inventory: "Reserving the item…",
-  charge_payment: "Charging the card…",
-  schedule_fulfillment: "Booking the delivery…",
-  verify_order: "Checking that the order went through…",
+const ECOMMERCE_COPY: StoryCopy = {
+  project: projectEcommerceFlow,
+  proofId: "verify-order",
+  chargeTool: "charge_payment",
+  labels: {
+    "reserve-inventory": "Reserve the item",
+    "charge-payment": "Charge the card",
+    "schedule-fulfillment": "Book the delivery",
+    "verify-order": "Check the order went through",
+    "cancel-fulfillment": "Cancel the delivery",
+    "refund-payment": "Refund the card",
+    "release-inventory": "Release the item",
+  },
+  doing: {
+    reserve_inventory: "Reserving the item…",
+    charge_payment: "Charging the card…",
+    schedule_fulfillment: "Booking the delivery…",
+    verify_order: "Checking that the order went through…",
+  },
+  done: {
+    reserve_inventory: "The item is reserved.",
+    charge_payment: "The card was charged.",
+    schedule_fulfillment: "The delivery is booked.",
+  },
+  undone: {
+    cancel_fulfillment: "Cancelled the delivery, because the order can't go through.",
+    refund_payment: "Refunded the card, because the order can't go through.",
+    release_inventory: "Released the item back to the shop.",
+  },
+  undoComplete: {
+    "cancel-fulfillment": "Cancelled",
+    "refund-payment": "Refunded",
+    "release-inventory": "Released",
+  },
+  summary: {
+    aborted_clean: "Stopped before changing anything. Nothing needs to be put back.",
+    compensated_verified:
+      "The order couldn't be completed, so everything was put back: the delivery was cancelled, the card was refunded, and the item was released. Nothing was left half-done.",
+    human_required:
+      "Stopped safely: the refund couldn't be confirmed, so a person has to check it before anything else happens.",
+    succeeded_verified:
+      "The order went through: the item is reserved, the card was charged once, and the delivery is booked. A final check confirmed it.",
+  },
+  fixedCaptions: {
+    compensation_completed: "Every earlier step is undone.",
+    compensation_started:
+      "The delivery company turned the order down, so the earlier steps are being undone, newest first.",
+    human_required: "Paused: a person must confirm the refund before anything else happens.",
+    human_resolved:
+      "The person confirmed the refund (in this demo, the script plays that person). Finishing the undo.",
+    saga_started: "Starting the order.",
+    terminal_assigned: "Finished.",
+  },
+  settledReply: "The card company confirmed one charge.",
+  lostChargeReply:
+    "The card company didn't reply. Asking whether the card was charged, instead of charging it again.",
+  proofPassed: "The final check passed: the order really went through.",
+  proofFailed: "The final check failed: the delivery company turned the order down.",
+  unknownUndoCaption:
+    "The refund can't be confirmed. Stopping to ask a person instead of guessing.",
+  checkingUndoReply: "Asking the card company whether the refund went through…",
 };
 
-const DONE: Readonly<Record<string, string>> = {
-  reserve_inventory: "The item is reserved.",
-  charge_payment: "The card was charged.",
-  schedule_fulfillment: "The delivery is booked.",
-};
-
-const UNDONE: Readonly<Record<string, string>> = {
-  cancel_fulfillment: "Cancelled the delivery, because the order can't go through.",
-  refund_payment: "Refunded the card, because the order can't go through.",
-  release_inventory: "Released the item back to the shop.",
-};
-
-const SUMMARY: Readonly<Record<string, string>> = {
-  aborted_clean: "Stopped before changing anything. Nothing needs to be put back.",
-  compensated_verified:
-    "The order couldn't be completed, so everything was put back: the delivery was cancelled, the card was refunded, and the item was released. Nothing was left half-done.",
-  human_required:
-    "Stopped safely: the refund couldn't be confirmed, so a person has to check it before anything else happens.",
-  succeeded_verified:
-    "The order went through: the item is reserved, the card was charged once, and the delivery is booked. A final check confirmed it.",
-};
-
-const FIXED_CAPTIONS: Readonly<Record<string, string>> = {
-  compensation_completed: "Every earlier step is undone.",
-  compensation_started:
-    "The delivery company turned the order down, so the earlier steps are being undone, newest first.",
-  human_required: "Paused: a person must confirm the refund before anything else happens.",
-  human_resolved:
-    "The person confirmed the refund (in this demo, the script plays that person). Finishing the undo.",
-  saga_started: "Starting the order.",
-  terminal_assigned: "Finished.",
-};
-
-type CaptionRule = (event: TraceEvent) => string | undefined;
-
-const CAPTION_RULES: Readonly<Record<string, CaptionRule>> = {
-  agent_decision_recorded: (event) =>
-    event.tool_name === null ? "Every step is done. Wrapping up." : DOING[event.tool_name],
-  compensation_outcome_recorded: (event) =>
-    outputKind(event) === "outcome_unknown"
-      ? "The refund can't be confirmed. Stopping to ask a person instead of guessing."
-      : UNDONE[event.tool_name ?? ""],
-  effect_outcome_recorded: (event) =>
-    outputKind(event) === "outcome_unknown" ? lostReply(event) : DONE[event.tool_name ?? ""],
-  invariant_evaluated: (event) =>
-    event.redacted_output?.verified === true
-      ? "The final check passed: the order really went through."
-      : "The final check failed: the delivery company turned the order down.",
-  reconciliation_recorded: (event) =>
-    outputKind(event) === "reconcile_effect_confirmed"
-      ? `${SETTLED_REPLY} Carrying on.`
-      : "Asking the card company whether the refund went through…",
+const ORDER_CONCERN_COPY: StoryCopy = {
+  project: projectOrderConcernFlow,
+  proofId: "verify-original-stopped",
+  chargeTool: "issue_shipping_credit",
+  labels: {
+    "reserve-replacement": "Hold a replacement item",
+    "issue-shipping-credit": "Add a $15 courtesy credit",
+    "book-express-courier": "Book an express courier",
+    "verify-original-stopped": "Check the original parcel stopped",
+    "cancel-express-courier": "Cancel the express courier",
+    "reverse-shipping-credit": "Remove the $15 courtesy credit",
+    "release-replacement": "Put the replacement item back",
+  },
+  doing: {
+    reserve_replacement: "Holding a replacement item for order_8841…",
+    issue_shipping_credit: "Adding a $15 courtesy shipping credit…",
+    book_express_courier: "Booking an express courier…",
+    verify_original_stopped: "Checking whether the original parcel is still at the depot…",
+  },
+  done: {
+    reserve_replacement: "A replacement item is held.",
+    issue_shipping_credit: "The $15 courtesy credit was applied.",
+    book_express_courier: "The express courier is booked.",
+  },
+  undone: {
+    cancel_express_courier:
+      "Cancelled the express courier, because the original parcel is already on the truck.",
+    reverse_shipping_credit:
+      "Removed the $15 courtesy credit, because the original parcel is on its way.",
+    release_replacement: "Put the replacement item back into stock.",
+  },
+  undoComplete: {
+    "cancel-express-courier": "Cancelled",
+    "reverse-shipping-credit": "Removed",
+    "release-replacement": "Released",
+  },
+  summary: {
+    aborted_clean: "Stopped before changing anything. Nothing needs to be put back.",
+    compensated_verified:
+      "The original parcel was just scanned onto a delivery truck, so every new step was undone newest-first: the express courier was cancelled, the $15 credit was removed, and the replacement item was put back. No duplicate shipment went out.",
+    human_required:
+      "Stopped safely: removing the $15 credit couldn't be confirmed, so a support lead must check it before anything else happens.",
+    succeeded_verified:
+      "The depot confirmed the original parcel stopped, so the replacement item is held, the $15 credit was applied once, and the express courier is booked.",
+  },
+  fixedCaptions: {
+    compensation_completed: "Every earlier step is undone.",
+    compensation_started:
+      "The original parcel was just scanned onto a delivery truck, so the earlier steps are being undone, newest first.",
+    human_required:
+      "Paused: a support lead must confirm the $15 credit removal before anything else happens.",
+    human_resolved:
+      "The support lead confirmed the credit removal (in this demo, the script plays that person). Finishing the undo.",
+    saga_started: "Customer concern accepted. Starting the stuck-order fix.",
+    terminal_assigned: "Finished.",
+  },
+  settledReply: "Billing confirmed one $15 courtesy credit.",
+  lostChargeReply:
+    "Billing didn't reply. Asking whether the $15 credit already applied, instead of crediting twice.",
+  proofPassed: "The depot check passed: the original parcel was stopped before leaving.",
+  proofFailed: "The depot check failed: the original parcel was just scanned onto a truck.",
+  unknownUndoCaption:
+    "The $15 credit removal can't be confirmed. Stopping to ask a support lead instead of guessing.",
+  checkingUndoReply: "Asking billing whether the $15 credit removal went through…",
 };
 
 export interface PlainStoryOptions {
+  readonly presentation?: ScenarioIndexEntry["presentation"];
   /** False while the run is still going: a pause for a person is then not the end. */
   readonly runFinished?: boolean;
 }
@@ -110,14 +195,18 @@ export function plainLiveStory(
   projection: ReplayProjection,
   options: PlainStoryOptions = {},
 ): PlainStory {
-  const flow = projectEcommerceFlow(projection);
+  const copy = options.presentation === "order-concern" ? ORDER_CONCERN_COPY : ECOMMERCE_COPY;
+  const flow = copy.project(projection);
   const status = projection.currentStatus;
   const ended = FINAL_STATUSES.has(status) || options.runFinished !== false;
   return {
-    caption: captionWithContext(projection.events, projection.currentEvent),
-    forward: flow.forward.map(plainStep),
-    summary: ended ? (SUMMARY[status] ?? null) : null,
-    undo: markNextUndo(flow.rollback.map(plainStep), projection.currentStatus),
+    caption: captionWithContext(projection.events, projection.currentEvent, copy),
+    forward: flow.forward.map((item) => plainStep(item, copy)),
+    summary: ended ? (copy.summary[status] ?? null) : null,
+    undo: markNextUndo(
+      flow.rollback.map((item) => plainStep(item, copy)),
+      projection.currentStatus,
+    ),
   };
 }
 
@@ -128,49 +217,65 @@ function markNextUndo(steps: readonly PlainStep[], status: string): readonly Pla
   return steps.map((step, index) => (index === next ? { ...step, status: "Up next" } : step));
 }
 
-/** A finished undo says what it did, so "Done" never sits next to "Undone". */
-const UNDO_COMPLETE: Readonly<Record<string, string>> = {
-  "cancel-fulfillment": "Cancelled",
-  "refund-payment": "Refunded",
-  "release-inventory": "Released",
-};
-
-function plainStep(step: FlowStep): PlainStep {
-  const state = settledState(step);
-  const undone = state === "complete" ? UNDO_COMPLETE[step.id] : undefined;
+function plainStep(step: FlowStep, copy: StoryCopy): PlainStep {
+  const state = settledState(step, copy.proofId);
+  const undone = state === "complete" ? copy.undoComplete[step.id] : undefined;
   return {
     id: step.id,
-    label: LABELS[step.id] ?? step.label,
+    label: copy.labels[step.id] ?? step.label,
     state,
     status: undone ?? STATUS[state],
   };
 }
 
 /** Only the final check fails; the steps before it did happen until they are undone. */
-function settledState(step: FlowStep): FlowStepState {
-  return step.state === "failed" && step.id !== "verify-order" ? "complete" : step.state;
+function settledState(step: FlowStep, proofId: string): FlowStepState {
+  return step.state === "failed" && step.id !== proofId ? "complete" : step.state;
 }
 
-const SETTLED_REPLY = "The card company confirmed one charge.";
-
 /** When the agent moves on at once, keep the news that let it move on. */
-function captionWithContext(events: readonly TraceEvent[], current: TraceEvent): string {
+function captionWithContext(
+  events: readonly TraceEvent[],
+  current: TraceEvent,
+  copy: StoryCopy,
+): string {
   const previous = events.at(-2);
   const settled =
     current.event_type === "agent_decision_recorded" &&
     previous?.event_type === "reconciliation_recorded";
-  return settled ? `${SETTLED_REPLY} ${captionFor(current)}` : captionFor(current);
+  const next = captionFor(current, copy);
+  return settled ? `${copy.settledReply} ${next}` : next;
 }
 
-function captionFor(event: TraceEvent): string {
-  const rule = CAPTION_RULES[event.event_type];
-  return rule?.(event) ?? FIXED_CAPTIONS[event.event_type] ?? "Working…";
-}
-
-function lostReply(event: TraceEvent): string {
-  if (event.tool_name === "charge_payment") {
-    return "The card company didn't reply. Asking whether the card was charged, instead of charging it again.";
+function captionFor(event: TraceEvent, copy: StoryCopy): string {
+  if (event.event_type === "agent_decision_recorded") {
+    return event.tool_name === null
+      ? "Every step is done. Wrapping up."
+      : (copy.doing[event.tool_name] ?? "Working…");
   }
+  if (event.event_type === "compensation_outcome_recorded") {
+    return outputKind(event) === "outcome_unknown"
+      ? copy.unknownUndoCaption
+      : (copy.undone[event.tool_name ?? ""] ?? "Working…");
+  }
+  if (event.event_type === "effect_outcome_recorded") {
+    return outputKind(event) === "outcome_unknown"
+      ? lostReply(event, copy)
+      : (copy.done[event.tool_name ?? ""] ?? "Working…");
+  }
+  if (event.event_type === "invariant_evaluated") {
+    return event.redacted_output?.verified === true ? copy.proofPassed : copy.proofFailed;
+  }
+  if (event.event_type === "reconciliation_recorded") {
+    return outputKind(event) === "reconcile_effect_confirmed"
+      ? `${copy.settledReply} Carrying on.`
+      : copy.checkingUndoReply;
+  }
+  return copy.fixedCaptions[event.event_type] ?? "Working…";
+}
+
+function lostReply(event: TraceEvent, copy: StoryCopy): string {
+  if (event.tool_name === copy.chargeTool) return copy.lostChargeReply;
   return "No reply yet. Asking what happened instead of trying again.";
 }
 

@@ -80,8 +80,12 @@ export function RecorderWorkbench(props: RecorderWorkbenchProps) {
         {provenanceDescription(entry.mode)} {live ? LIVE_SOURCE : RECORDED_SOURCE}
       </p>
       <ScenarioResults assessments={assessments} index={index} />
-      {entry.presentation === "ecommerce" ? (
-        <SagaFlow isPlaying={replay.state.isPlaying} projection={projection} />
+      {entry.presentation === "ecommerce" || entry.presentation === "order-concern" ? (
+        <SagaFlow
+          isPlaying={replay.state.isPlaying}
+          presentation={entry.presentation}
+          projection={projection}
+        />
       ) : null}
       <div className={styles.workspace}>
         <RunTrajectory

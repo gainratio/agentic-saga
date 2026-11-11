@@ -9,15 +9,23 @@ export interface ScenarioAssessment {
   readonly detail: string;
 }
 
-const supportedIds = new Set([
+const ecommerceIds = new Set([
   "happy-path",
   "business-failure",
   "lost-response",
   "compensation-failure",
 ]);
+const orderConcernIds = new Set([
+  "happy-path",
+  "already-in-transit",
+  "lost-response",
+  "compensation-failure",
+]);
 
 export function supportsScenario(entry: ScenarioIndexEntry): boolean {
-  return entry.presentation === "ecommerce" && supportedIds.has(entry.id);
+  if (entry.presentation === "ecommerce") return ecommerceIds.has(entry.id);
+  if (entry.presentation === "order-concern") return orderConcernIds.has(entry.id);
+  return false;
 }
 
 export function assessScenario(entry: ScenarioIndexEntry, trace: RunTrace): ScenarioAssessment {
@@ -39,7 +47,7 @@ export function assessScenario(entry: ScenarioIndexEntry, trace: RunTrace): Scen
     };
   }
   if (entry.id === "compensation-failure" && trace.outcome === "human_required") {
-    return assessSafeStop(trace);
+    return assessSafeStop(trace, entry);
   }
   const expected =
     entry.id === "happy-path" || entry.id === "lost-response"
@@ -49,10 +57,17 @@ export function assessScenario(entry: ScenarioIndexEntry, trace: RunTrace): Scen
     return failed(`Expected ${expected}; the recording ends as ${trace.outcome}.`);
   }
   if (!verified) return failed(missingEvidence(expected));
-  if (entry.id === "lost-response" && !hasReconciledPayment(trace.events)) {
+  const chargeTool =
+    entry.presentation === "order-concern" ? "issue_shipping_credit" : "charge_payment";
+  const refundTool =
+    entry.presentation === "order-concern" ? "reverse_shipping_credit" : "refund_payment";
+  if (entry.id === "lost-response" && !hasReconciledPayment(trace.events, chargeTool)) {
     return failed("No provider evidence confirms the payment after its reply was lost.");
   }
-  if (entry.id === "compensation-failure" && !hasResolvedRefund(trace.events)) {
+  if (
+    entry.id === "compensation-failure" &&
+    !hasResolvedRefund(trace.events, chargeTool, refundTool)
+  ) {
     return failed(
       "The uncertain refund has no matching human resolution before recovery completed.",
     );
@@ -74,7 +89,8 @@ function passedDetail(id: string): string {
   if (id === "lost-response") return "Payment reconciled; order completed and verified.";
   if (id === "compensation-failure")
     return "Human review resolved the refund; every undo has a confirmed outcome.";
-  if (id === "business-failure") return "All earlier changes undone; each undo has a receipt.";
+  if (id === "business-failure" || id === "already-in-transit")
+    return "All earlier changes undone; each undo has a receipt.";
   return "Order completed and verified.";
 }
 
@@ -82,10 +98,13 @@ function failed(detail: string): ScenarioAssessment {
   return { state: "failed", label: "Not passed", detail };
 }
 
-function hasReconciledPayment(events: readonly TraceEvent[]): boolean {
+function hasReconciledPayment(
+  events: readonly TraceEvent[],
+  chargeTool = "charge_payment",
+): boolean {
   const unknownPayments = new Set<string>();
   for (const event of events) {
-    if (event.tool_name !== "charge_payment" || event.direction !== "forward") continue;
+    if (event.tool_name !== chargeTool || event.direction !== "forward") continue;
     if (
       event.operation_id !== null &&
       event.event_type === "effect_outcome_recorded" &&
@@ -104,11 +123,15 @@ function hasReconciledPayment(events: readonly TraceEvent[]): boolean {
   return false;
 }
 
-function uncertainRefund(events: readonly TraceEvent[]): TraceEvent | undefined {
+function uncertainRefund(
+  events: readonly TraceEvent[],
+  chargeTool = "charge_payment",
+  refundTool = "refund_payment",
+): TraceEvent | undefined {
   const confirmedCharges = new Set<string>();
   for (const event of events) {
     if (
-      event.tool_name === "charge_payment" &&
+      event.tool_name === chargeTool &&
       event.direction === "forward" &&
       event.operation_id !== null &&
       event.redacted_output?.kind === "effect_confirmed" &&
@@ -118,7 +141,7 @@ function uncertainRefund(events: readonly TraceEvent[]): TraceEvent | undefined 
     if (
       event.event_type === "compensation_outcome_recorded" &&
       event.direction === "compensation" &&
-      event.tool_name === "refund_payment" &&
+      event.tool_name === refundTool &&
       event.operation_id !== null &&
       event.redacted_output?.kind === "outcome_unknown" &&
       event.compensates_operation_id !== null &&
@@ -140,8 +163,12 @@ function refundPause(events: readonly TraceEvent[], refund: TraceEvent): TraceEv
   );
 }
 
-function assessSafeStop(trace: RunTrace): ScenarioAssessment {
-  const refund = uncertainRefund(trace.events);
+function assessSafeStop(trace: RunTrace, entry?: ScenarioIndexEntry): ScenarioAssessment {
+  const chargeTool =
+    entry?.presentation === "order-concern" ? "issue_shipping_credit" : "charge_payment";
+  const refundTool =
+    entry?.presentation === "order-concern" ? "reverse_shipping_credit" : "refund_payment";
+  const refund = uncertainRefund(trace.events, chargeTool, refundTool);
   const pause = refund && refundPause(trace.events, refund);
   const stopped =
     refund &&
@@ -157,8 +184,12 @@ function assessSafeStop(trace: RunTrace): ScenarioAssessment {
   };
 }
 
-function hasResolvedRefund(events: readonly TraceEvent[]): boolean {
-  const refund = uncertainRefund(events);
+function hasResolvedRefund(
+  events: readonly TraceEvent[],
+  chargeTool = "charge_payment",
+  refundTool = "refund_payment",
+): boolean {
+  const refund = uncertainRefund(events, chargeTool, refundTool);
   const pause = refund && refundPause(events, refund);
   if (!refund || !pause) return false;
   const resolution = events.find(
