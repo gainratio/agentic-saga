@@ -45,13 +45,18 @@ BANNED = (
     "at a glance",
     "try it in 60 seconds",
 )
-# Real output of `uv run poe demo`, captured from a run.
+# Real output of `uv run poe demo` and `uv run poe demo not-an-order`, captured from runs.
 TRY_IT_FACTS = (
     "uv run poe demo",
-    "Mode: scripted agent, simulated shop services, no API key, no model calls.",
-    "09 invariant_evaluated verify_order -> running",
+    (
+        "Layers: 1) Intake accepted order concern -> 2) Constrained step engine -> "
+        "3) Temporal workflow state -> 4) Paired deterministic tools."
+    ),
+    "09 invariant_evaluated verify_original_stopped -> running",
     "10 compensation_started -> compensating",
     "Live run finished: compensated_verified.",
+    "uv run poe demo not-an-order",
+    "Outcome: polite_decline (not an order processing issue; 0 workflows started, 0 tools).",
 )
 # Real output of the minimal example the "Use it" section is cut from.
 USE_IT_FACTS = (

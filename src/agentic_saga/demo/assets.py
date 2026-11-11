@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Final, Literal, cast
 
 from agentic_saga.contracts.trace import RunTrace
-from agentic_saga.demo.reference import REFERENCE_PRESENTATIONS, reference_summary
+from agentic_saga.demo.reference import (
+    ORDER_CONCERN_PRESENTATIONS,
+    REFERENCE_PRESENTATIONS,
+    order_concern_summary,
+    reference_summary,
+)
 
 _MAX_RUNS: Final[int] = 100
 _MAX_STATIC_FILES: Final[int] = 200
@@ -21,7 +26,7 @@ _MAX_INDEX_BYTES: Final[int] = 512 * 1024
 _MAX_NAME_CHARS: Final[int] = 120
 _MAX_SUMMARY_CHARS: Final[int] = 500
 _SCENARIO = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
-_Presentation = Literal["ecommerce"]
+_Presentation = Literal["ecommerce", "order-concern"]
 _RecordingMode = Literal["scripted", "live", "unknown"]
 
 
@@ -345,10 +350,22 @@ def _index_entry(
     }
     if presentation is not None:
         entry["presentation"] = presentation
-        if scenario in REFERENCE_PRESENTATIONS:
-            entry["name"] = REFERENCE_PRESENTATIONS[scenario]
-            entry["summary"] = reference_summary(trace)
+        _apply_presentation_metadata(entry, scenario, trace, presentation)
     return entry
+
+
+def _apply_presentation_metadata(
+    entry: dict[str, str],
+    scenario: str,
+    trace: RunTrace,
+    presentation: _Presentation,
+) -> None:
+    if presentation == "order-concern" and scenario in ORDER_CONCERN_PRESENTATIONS:
+        entry["name"] = ORDER_CONCERN_PRESENTATIONS[scenario]
+        entry["summary"] = order_concern_summary(trace)
+    elif presentation == "ecommerce" and scenario in REFERENCE_PRESENTATIONS:
+        entry["name"] = REFERENCE_PRESENTATIONS[scenario]
+        entry["summary"] = reference_summary(trace)
 
 
 def _index_payload(entries: tuple[dict[str, str], ...], default_run_id: str | None = None) -> bytes:
@@ -530,7 +547,7 @@ def _has_valid_mode(entry: dict[object, object]) -> bool:
 
 
 def _has_valid_presentation(entry: dict[object, object]) -> bool:
-    return entry.get("presentation", "ecommerce") == "ecommerce"
+    return entry.get("presentation", "ecommerce") in {"ecommerce", "order-concern"}
 
 
 def _is_bounded_text(value: object, maximum: int) -> bool:

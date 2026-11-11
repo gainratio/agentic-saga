@@ -68,6 +68,10 @@ describe("parseScenarioIndex", () => {
     firstRun(ecommerce).presentation = "ecommerce";
     expect(parseScenarioIndex(ecommerce)).toEqual(expect.objectContaining({ ok: true }));
 
+    const orderConcern = validIndex();
+    firstRun(orderConcern).presentation = "order-concern";
+    expect(parseScenarioIndex(orderConcern)).toEqual(expect.objectContaining({ ok: true }));
+
     const unknown = validIndex();
     firstRun(unknown).presentation = "banking";
     expect(parseScenarioIndex(unknown)).toEqual(expect.objectContaining({ ok: false }));

@@ -131,10 +131,11 @@ def test_demo_task_runs_the_live_browser_demo() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
     # When
-    task = project["tool"]["poe"]["tasks"]["demo"]
+    tasks = project["tool"]["poe"]["tasks"]
 
     # Then
-    assert task == "python -m examples.ecommerce.live"
+    assert tasks["demo"] == "python -m examples.order_concern.live"
+    assert tasks["demo-checkout"] == "python -m examples.ecommerce.live"
 
 
 class _Handle:

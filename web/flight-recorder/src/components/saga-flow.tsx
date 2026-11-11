@@ -1,19 +1,36 @@
 import type { ReplayProjection } from "../replay/project-replay";
-import { type FlowStep, projectEcommerceFlow } from "../story/project-ecommerce-flow";
+import type { ScenarioIndexEntry } from "../scenarios/schema";
+import {
+  type FlowStep,
+  projectEcommerceFlow,
+  projectOrderConcernFlow,
+} from "../story/project-ecommerce-flow";
 import styles from "./saga-flow.module.css";
 
 export function SagaFlow(props: {
   readonly isPlaying: boolean;
+  readonly presentation?: ScenarioIndexEntry["presentation"];
   readonly projection: ReplayProjection;
 }) {
-  const { isPlaying, projection } = props;
-  const flow = projectEcommerceFlow(projection);
+  const { isPlaying, presentation, projection } = props;
+  const isOrderConcern = presentation === "order-concern";
+  const flow = isOrderConcern
+    ? projectOrderConcernFlow(projection)
+    : projectEcommerceFlow(projection);
   return (
     <section aria-labelledby="ecommerce-saga-heading" className={styles.flow}>
       <header className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>Ecommerce example · At this replay event</p>
-          <h2 id="ecommerce-saga-heading">One order. Several systems. One safe outcome.</h2>
+          <p className={styles.eyebrow}>
+            {isOrderConcern
+              ? "Order-concern example · At this replay event"
+              : "Ecommerce example · At this replay event"}
+          </p>
+          <h2 id="ecommerce-saga-heading">
+            {isOrderConcern
+              ? "One customer concern. Four layers. One safe outcome."
+              : "One order. Several systems. One safe outcome."}
+          </h2>
         </div>
         <div
           aria-live={isPlaying ? "off" : "polite"}

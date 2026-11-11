@@ -1,0 +1,55 @@
+schema_version: "1.0"
+name: order_concern_recovery
+version: "1.0"
+objective: Resolve paid-not-delivered concern for order_8841 (customer_demo_001, USD 79.00) by dispatching a verified express replacement with a USD 15.00 courtesy credit, or reverse every step if the original parcel is already out for delivery.
+instructions:
+  - Use only the currently advertised forward tool and the exact public order values in the objective.
+  - Choose one tool at a time and reassess public evidence after every result.
+  - Finish only when the Workflow advertises succeeded_verified as an allowed target.
+  - Never request compensation or human escalation; the deterministic Workflow owns both decisions.
+success_criteria:
+  - Replacement stock is reserved, courtesy credit is issued, express courier is booked, and verify_original_stopped returns verified true.
+autonomy:
+  mode: guarded
+  instructions:
+    - Propose forward work within fixed budgets; never invent carrier or billing state.
+budgets:
+  turn_limit: 6
+  tool_call_limit: 4
+  elapsed_ms_limit: 180000
+  token_limit: 6000
+tools:
+  catalog_sha256: "61e1f44c2e9094e0cd8320743facfbde7a4d88a83f754214cfb2187cc221e73c"
+  allowed:
+    - reserve_replacement
+    - issue_shipping_credit
+    - book_express_courier
+    - verify_original_stopped
+checks:
+  policy: []
+  success:
+    - resolution_verified
+  compensation:
+    - obligations_reversed
+  clean_abort:
+    - no_external_effects
+escalation:
+  conditions:
+    - A compensation outcome remains unresolved after safe Activity attempts.
+  instructions:
+    - Pause before later compensation and require trusted support-lead authorization evidence.
+example_paths:
+  - name: replacement succeeds
+    kind: happy_path
+    narrative:
+      - Reserve replacement stock, issue the courtesy credit, and book the express courier as each tool becomes eligible.
+      - Call verify_original_stopped for authoritative carrier proof, then finish as succeeded_verified.
+  - name: original parcel just went out for delivery
+    kind: compensation_path
+    narrative:
+      - If verify_original_stopped returns verified false, stop forward planning.
+      - The Workflow derives cancel_express_courier, reverse_shipping_credit, and release_replacement newest-first from confirmed receipts.
+  - name: credit reversal reply is unresolved
+    kind: compensation_path
+    narrative:
+      - The Workflow pauses before releasing replacement stock and resumes only after its verifier accepts a support-lead authorization reference.

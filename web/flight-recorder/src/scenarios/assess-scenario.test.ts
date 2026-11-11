@@ -191,4 +191,42 @@ describe("scenario assessment", () => {
       label: "No assessment",
     });
   });
+
+  it("evaluates order-concern scenarios using order-concern tool names", () => {
+    const orderEntry = {
+      ...entry("business-failure"),
+      id: "already-in-transit",
+      presentation: "order-concern" as const,
+    };
+    expect(supportsScenario(orderEntry)).toBe(true);
+    expect(assessScenario(orderEntry, trace("business-failure"))).toMatchObject({
+      state: "passed",
+      label: "Passed",
+    });
+
+    const lostEntry = { ...entry("lost-response"), presentation: "order-concern" as const };
+    const mappedLost: RunTrace = {
+      ...trace("lost-response"),
+      events: trace("lost-response").events.map((event) => ({
+        ...event,
+        tool_name: event.tool_name === "charge_payment" ? "issue_shipping_credit" : event.tool_name,
+      })),
+    };
+    expect(assessScenario(lostEntry, mappedLost).state).toBe("passed");
+
+    const pauseEntry = { ...entry("compensation-failure"), presentation: "order-concern" as const };
+    const mappedPause: RunTrace = {
+      ...trace("compensation-failure"),
+      events: trace("compensation-failure").events.map((event) => ({
+        ...event,
+        tool_name:
+          event.tool_name === "charge_payment"
+            ? "issue_shipping_credit"
+            : event.tool_name === "refund_payment"
+              ? "reverse_shipping_credit"
+              : event.tool_name,
+      })),
+    };
+    expect(assessScenario(pauseEntry, mappedPause).state).toBe("passed");
+  });
 });

@@ -89,7 +89,12 @@ function liveSummary(value: string): string | undefined {
 }
 
 function outcomeSummary(entry: ScenarioIndexEntry, outcome: string): string {
-  const subject = entry.presentation === "ecommerce" ? "Order" : "Workflow";
+  const subject =
+    entry.presentation === "ecommerce"
+      ? "Order"
+      : entry.presentation === "order-concern"
+        ? "Order concern"
+        : "Workflow";
   if (outcome === "succeeded_verified") return `${subject} succeeded. Final state verified.`;
   if (outcome === "compensated_verified")
     return `${subject} failed. Recovery succeeded: all completed changes were safely undone.`;

@@ -115,4 +115,70 @@ describe("live run view", () => {
 
     expect(result.violations).toEqual([]);
   });
+
+  it("renders the 4-layer customer order-concern story without technical jargon", () => {
+    const toolMap: Readonly<Record<string, string>> = {
+      reserve_inventory: "reserve_replacement",
+      charge_payment: "issue_shipping_credit",
+      schedule_fulfillment: "book_express_courier",
+      verify_order: "verify_original_stopped",
+      cancel_fulfillment: "cancel_express_courier",
+      refund_payment: "reverse_shipping_credit",
+      release_inventory: "release_replacement",
+    };
+    const base = failureTrace();
+    const mapped: RunTrace = {
+      ...base,
+      events: base.events.map((event) => ({
+        ...event,
+        tool_name: event.tool_name ? (toolMap[event.tool_name] ?? event.tool_name) : null,
+      })),
+    };
+    const props = liveProps(mapped);
+    const entry = {
+      ...props.entry,
+      id: "already-in-transit",
+      name: "Original parcel scanned onto truck",
+      presentation: "order-concern" as const,
+    };
+
+    for (const count of [1, 4, 9, 10, 12, 15]) {
+      const partial =
+        count === mapped.events.length
+          ? mapped
+          : {
+              ...mapped,
+              events: mapped.events.slice(0, count),
+              finished_at: null,
+              outcome: mapped.events[count - 1]?.after_status ?? mapped.outcome,
+              proofs: [],
+            };
+      const view = render(
+        <LiveRecorder
+          entry={entry}
+          index={{ ...props.index, runs: [entry] }}
+          onSelectRun={vi.fn()}
+          trace={partial}
+        />,
+      );
+      const section = screen.getByRole("region", {
+        name: "I paid $79 and never got my order — can an AI fix it safely?",
+      });
+      expect(section.textContent).not.toMatch(JARGON);
+      if (count === mapped.events.length) {
+        expect(screen.getByLabelText("Customer message")).toHaveTextContent("order_8841");
+        expect(screen.getByLabelText("How the four parts work together")).toBeVisible();
+        expect(screen.getByRole("status", { name: "Result" })).toHaveTextContent(
+          "No duplicate shipment went out.",
+        );
+        fireEvent.click(screen.getByText("Technical details for developers"));
+        expect(
+          screen.getByRole("heading", {
+            name: "One customer concern. Four layers. One safe outcome.",
+          }),
+        ).toBeVisible();
+      }
+      view.unmount();
+    }
+  });
 });
