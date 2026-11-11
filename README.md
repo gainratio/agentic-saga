@@ -20,6 +20,8 @@ the undo cannot be proven, it stops and waits for a person.
 
 ![The live demo page: "What if an AI agent's order fails halfway?" Steps reserve the item, charge the card and book the delivery turn Done; the final check fails; a caption explains the delivery company turned the order down; the delivery is cancelled, the card refunded and the item released; the result says nothing was left half-done](docs/assets/live-demo.gif)
 
+**[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-saga/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
+
 ## Try it
 
 You need [uv](https://docs.astral.sh/uv/), git, and an internet connection for the first run. uv
